@@ -116,6 +116,7 @@
     for (const b of document.querySelectorAll(".cbtn")) {
       b.classList.toggle("on", b.dataset.cat === filters.cat);
     }
+    $("caps-notice").classList.toggle("hidden", filters.cat !== "caps");
     for (const b of document.querySelectorAll(".vbtn")) {
       b.classList.toggle("on", vFilter.size === 0 || (b.dataset.v !== "all" && vFilter.has(Number(b.dataset.v))));
     }
