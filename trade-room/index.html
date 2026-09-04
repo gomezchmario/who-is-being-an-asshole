@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../style.css?v=15">
+  <link rel="stylesheet" href="../style.css?v=16">
   <style>
     details.doctrine { border: 1px solid var(--border); background: var(--panel); margin-bottom: 10px; }
     details.doctrine > summary {
@@ -33,6 +33,11 @@
     .fleetline { margin-top: 6px; font-size: 12px; color: var(--phosphor-faint); }
     .tr-table { width: 100%; font-size: 13px; min-width: 760px; }
     .searchbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 0 0 8px; }
+    .frow input:not(#q) {
+      background: #04120a; border: 1px solid var(--border); color: var(--phosphor);
+      font-family: inherit; font-size: 13px; padding: 4px 6px; width: 80px; text-align: right;
+    }
+    .frow input:focus { outline: 1px solid var(--phosphor); }
     #q {
       background: #04120a; border: 1px solid var(--border); color: var(--phosphor);
       font-family: inherit; font-size: 14px; padding: 4px 8px; width: 220px;
@@ -98,8 +103,21 @@
     <details class="doctrine" open>
       <summary>DOCTRINE SHIPS DYING (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
-        <div class="searchbar">
-          <button id="loss-mode" class="fbtn" title="Group hulls under their doctrine, in war-room order (Nightmares, TFI, Drakes first)">GROUP BY DOCTRINE</button>
+        <div class="fgrid" style="margin-bottom:8px">
+          <div class="frow">
+            <span class="flabel dim">VIEW</span>
+            <button id="loss-mode" class="fbtn" title="Group hulls under their doctrine, in war-room order (Nightmares, TFI, Drakes first)">GROUP BY DOCTRINE</button>
+            <span id="loss-hint" class="dim" style="font-size:12px"></span>
+          </div>
+          <div class="frow">
+            <span class="flabel dim">HIDE</span>
+            <button id="f-lost" class="fbtn on" title="Hide hulls with fewer losses than this">LOST &lt;</button>
+            <input type="text" id="lost-min" value="5" spellcheck="false">
+            <span class="sep dim">│</span>
+            <button id="f-stock" class="fbtn on" title="Hide hulls already stocked for more than this many months">STOCK &gt;</button>
+            <input type="text" id="stock-max" value="3" spellcheck="false">
+            <span class="dim">MONTHS</span>
+          </div>
         </div>
         <div class="tablewrap"><table class="tr-table" id="loss-table">
           <thead><tr>
@@ -119,18 +137,35 @@
     <details class="doctrine" open>
       <summary>SUPPLY OPPORTUNITIES — PROFIT AFTER HAULING &amp; TAX</summary>
       <div class="inner">
-        <div class="searchbar">
-          <input id="q" type="text" placeholder="filter items…" spellcheck="false">
-          <button class="fbtn cbtn on" data-f="all">ALL</button>
-          <button class="fbtn cbtn" data-f="miss">MISSING / UNSTOCKED</button>
-          <button class="fbtn cbtn" data-f="ammo">AMMO+DRONES</button>
-          <button class="fbtn cbtn" data-f="mods">MODULES</button>
-          <button class="fbtn cbtn" data-f="ships">SHIPS</button>
-          <button class="fbtn cbtn" data-f="imp">IMPLANTS</button>
-          <button class="fbtn cbtn" data-f="ind">INDUSTRY</button>
-          <span class="sep dim">│</span>
-          <button id="opp-scope" class="fbtn" title="Include every type sold on the XHQ market, not just doctrine and industry items">WHOLE MARKET</button>
-          <button id="opp-src" class="fbtn" title="Which hub you buy from — affects cost, profit and the unstocked sell price">BUY: JITA</button>
+        <div class="fgrid" style="margin-bottom:8px">
+          <div class="frow">
+            <span class="flabel dim">FIND</span>
+            <input id="q" type="text" placeholder="filter items…" spellcheck="false">
+            <span class="sep dim">│</span>
+            <button id="opp-scope" class="fbtn" title="Include every type sold on the XHQ market, not just doctrine and industry items">WHOLE MARKET</button>
+            <button id="opp-src" class="fbtn" title="Which hub you buy from — affects cost, profit and the unstocked sell price">BUY: JITA</button>
+            <span id="opp-hint" class="dim" style="font-size:12px"></span>
+          </div>
+          <div class="frow">
+            <span class="flabel dim">SHOW</span>
+            <button class="fbtn cbtn on" data-f="all">ALL</button>
+            <button class="fbtn cbtn" data-f="miss">MISSING / UNSTOCKED</button>
+            <button class="fbtn cbtn" data-f="ammo">AMMO+DRONES</button>
+            <button class="fbtn cbtn" data-f="mods">MODULES</button>
+            <button class="fbtn cbtn" data-f="ships">SHIPS</button>
+            <button class="fbtn cbtn" data-f="imp">IMPLANTS</button>
+            <button class="fbtn cbtn" data-f="ind">INDUSTRY</button>
+          </div>
+          <div class="frow">
+            <span class="flabel dim">HIDE</span>
+            <button id="f-profit" class="fbtn on" title="Hide items whose per-unit profit is below this">PROFIT/U &lt;</button>
+            <input type="text" id="profit-min" value="50,000" spellcheck="false">
+            <span class="dim">ISK</span>
+            <span class="sep dim">│</span>
+            <button id="f-moves" class="fbtn on" title="Hide items that trade less than this per day">MOVES/D &lt;</button>
+            <input type="text" id="moves-min" value="1" spellcheck="false">
+            <span class="dim">/DAY</span>
+          </div>
         </div>
         <div class="tablewrap"><table class="tr-table" id="opp-table">
           <thead><tr>
@@ -217,7 +252,8 @@
     let data = null, contracts = null;
     let isoJita = null; // Helium Isotopes Jita price, from trade data
     const filter = { f: "all", q: "" };
-    const oppState = { whole: false, src: "jita" };
+    const oppState = { whole: false, src: "jita", touched: false, hideProfit: true, hideMoves: true };
+    const lossFilters = { touched: false, hideLost: true, hideStock: true };
 
     // --- cost model, persisted per browser ---
     const PKEYS = ["p-isoly", "p-ly", "p-isoprice", "p-flat", "p-cap", "p-haul", "p-broker", "p-tax", "p-margin"];
@@ -315,10 +351,22 @@
         </tr>`;
       };
 
+      // Default view: top 10 by losses. Touching any control unlocks the
+      // full board with the HIDE thresholds applied.
+      let visible = entries;
+      if (!lossFilters.touched) {
+        visible = entries.slice().sort((a, b) => b.n - a.n).slice(0, 10);
+        $("loss-hint").textContent = "— TOP 10 BY LOSSES · touch a filter for the full board";
+      } else {
+        $("loss-hint").textContent = "";
+        if (lossFilters.hideLost) visible = visible.filter((e) => e.n >= num($("lost-min").value, 5));
+        if (lossFilters.hideStock) visible = visible.filter((e) => e.months <= num($("stock-max").value, 3));
+      }
+
       let html;
-      if (lossState.grouped && docOrder.length) {
+      if (lossFilters.touched && lossState.grouped && docOrder.length) {
         const groups = new Map();
-        for (const e of entries) {
+        for (const e of visible) {
           const di = hullDoc.has(e.id) ? hullDoc.get(e.id) : -1;
           if (!groups.has(di)) groups.set(di, []);
           groups.get(di).push(e);
@@ -332,10 +380,10 @@
         }).join("");
       } else {
         const k = lossState.key;
-        entries.sort((a, b) => k === "name"
+        if (lossFilters.touched) visible.sort((a, b) => k === "name"
           ? lossState.dir * a.name.localeCompare(b.name)
           : lossState.dir * ((a[k] ?? -Infinity) - (b[k] ?? -Infinity)));
-        html = entries.map(rowHtml).join("");
+        html = visible.map(rowHtml).join("");
       }
       $("loss-body").innerHTML = html || '<tr><td class="left dim" colspan="5">no doctrine losses recorded yet — killboard history builds up with each scan</td></tr>';
 
@@ -386,9 +434,21 @@
           const iskday = profit * mov;
           return { it, sell, profit, pm3, roi, mov, iskday };
         })
-        .sort((a, b) => b.iskday - a.iskday)
-        .slice(0, 400);
-      for (const { it, sell, profit, pm3, roi, mov, iskday } of list) {
+        .sort((a, b) => b.iskday - a.iskday);
+      // Default view: top 10 by ISK/DAY. Touching any control unlocks the
+      // full board with the HIDE thresholds applied.
+      let shown;
+      if (!oppState.touched) {
+        shown = list.slice(0, 10);
+        $("opp-hint").textContent = "— TOP 10 BY ISK/DAY · touch a filter for the full board";
+      } else {
+        $("opp-hint").textContent = "";
+        shown = list;
+        if (oppState.hideProfit) shown = shown.filter((x) => x.profit >= num($("profit-min").value, 50000));
+        if (oppState.hideMoves) shown = shown.filter((x) => x.mov >= num($("moves-min").value, 1));
+        shown = shown.slice(0, 400);
+      }
+      for (const { it, sell, profit, pm3, roi, mov, iskday } of shown) {
         const tags = [];
         if (!it.xhq) tags.push('<span class="demandtag d-miss">MISSING</span>');
         if (it.lost) tags.push(`<span class="demandtag d-lost">${it.lost} LOST/30D</span>`);
@@ -464,28 +524,42 @@
     for (const k of PKEYS) $(k).addEventListener("input", () => { saveParams(); renderOpps(); });
     for (const b of document.querySelectorAll(".cbtn")) {
       b.addEventListener("click", () => {
+        oppTouch();
         filter.f = b.dataset.f;
         for (const x of document.querySelectorAll(".cbtn")) x.classList.toggle("on", x === b);
         renderOpps();
       });
     }
+    const oppTouch = () => { oppState.touched = true; };
+    const lossTouch = () => { lossFilters.touched = true; };
+    $("f-profit").addEventListener("click", () => { oppTouch(); oppState.hideProfit = !oppState.hideProfit; $("f-profit").classList.toggle("on", oppState.hideProfit); renderOpps(); });
+    $("profit-min").addEventListener("input", () => { oppTouch(); renderOpps(); });
+    $("f-moves").addEventListener("click", () => { oppTouch(); oppState.hideMoves = !oppState.hideMoves; $("f-moves").classList.toggle("on", oppState.hideMoves); renderOpps(); });
+    $("moves-min").addEventListener("input", () => { oppTouch(); renderOpps(); });
+    $("f-lost").addEventListener("click", () => { lossTouch(); lossFilters.hideLost = !lossFilters.hideLost; $("f-lost").classList.toggle("on", lossFilters.hideLost); renderLosses(); });
+    $("lost-min").addEventListener("input", () => { lossTouch(); renderLosses(); });
+    $("f-stock").addEventListener("click", () => { lossTouch(); lossFilters.hideStock = !lossFilters.hideStock; $("f-stock").classList.toggle("on", lossFilters.hideStock); renderLosses(); });
+    $("stock-max").addEventListener("input", () => { lossTouch(); renderLosses(); });
     $("opp-scope").addEventListener("click", () => {
+      oppTouch();
       oppState.whole = !oppState.whole;
       $("opp-scope").classList.toggle("on", oppState.whole);
       renderOpps();
     });
     $("opp-src").addEventListener("click", () => {
+      oppTouch();
       oppState.src = oppState.src === "jita" ? "amarr" : "jita";
       $("opp-src").textContent = "BUY: " + oppState.src.toUpperCase();
       renderOpps();
     });
-    $("q").addEventListener("input", () => { filter.q = $("q").value.trim().toLowerCase(); renderOpps(); });
+    $("q").addEventListener("input", () => { oppTouch(); filter.q = $("q").value.trim().toLowerCase(); renderOpps(); });
     attachSort($("opp-table"));
     // Losses table: custom sort handlers (column click returns to flat mode).
     {
       const KEYS = ["name", "n", "hulls", "cons", "months"];
       [...document.querySelectorAll("#loss-table th")].forEach((th, i) => {
         th.addEventListener("click", () => {
+          lossTouch();
           lossState.grouped = false;
           $("loss-mode").classList.remove("on");
           if (lossState.key === KEYS[i]) lossState.dir = -lossState.dir;
@@ -494,6 +568,7 @@
         });
       });
       $("loss-mode").addEventListener("click", () => {
+        lossTouch();
         lossState.grouped = !lossState.grouped;
         $("loss-mode").classList.toggle("on", lossState.grouped);
         renderLosses();
