@@ -202,7 +202,12 @@
     }
 
     $("go").addEventListener("click", appraise);
-    $("asking").addEventListener("input", judge);
+    $("asking").addEventListener("input", () => {
+      const el = $("asking");
+      const m = el.value.replace(/,/g, "").match(/^(\d+)(\.\d*)?\s*([kmb])?$/i);
+      if (m) el.value = Number(m[1]).toLocaleString("en-US") + (m[2] || "") + (m[3] || "");
+      judge();
+    });
     $("paste").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) appraise(); });
   })();
   </script>
