@@ -383,6 +383,29 @@ tr.gonerow td { opacity: 0.6; }
   color: #1a0404;
   box-shadow: 0 0 10px rgba(255, 59, 59, 0.5);
 }
+
+/* Verdict filter buttons light up in their tier's color once chosen */
+.vbtn.on[data-v="5"], .vbtn.on[data-v="4"] {
+  background: var(--red); border-color: var(--red); color: #1a0404;
+  box-shadow: 0 0 10px rgba(255, 59, 59, 0.5);
+}
+.vbtn.on[data-v="5"] { animation: pulse-red 1.6s ease-in-out infinite; }
+.vbtn.on[data-v="3"] {
+  background: #ff7a29; border-color: #ff7a29; color: #1a0e02;
+  box-shadow: 0 0 10px rgba(255, 122, 41, 0.5);
+}
+.vbtn.on[data-v="2"] {
+  background: #ffd75e; border-color: #ffd75e; color: #1c1400;
+  box-shadow: 0 0 10px rgba(255, 215, 94, 0.4);
+}
+.vbtn.on[data-v="1"] {
+  background: var(--amber); border-color: var(--amber); color: #1c1000;
+  box-shadow: 0 0 10px rgba(255, 176, 0, 0.4);
+}
+.vbtn.on[data-v="9"] {
+  background: #d8ff6b; border-color: #d8ff6b; color: #141a00;
+  box-shadow: 0 0 10px rgba(216, 255, 107, 0.4);
+}
 th.left, td.left { text-align: left; }
 th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
