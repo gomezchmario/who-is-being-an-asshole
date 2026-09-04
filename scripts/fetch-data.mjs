@@ -586,13 +586,17 @@ async function main() {
     // Module, Charge, Drone, Subsystem — drones count alongside ammo, not
     // modules, since they're consumed the same way.
     const ITEM_LOSS_CATS = new Set([7, 8, 18, 32]);
+    // v1 cache entries were plain [shipTypeId, dateStr] tuples with no item
+    // breakdown. Bumping this discards any cache below it once, forcing a
+    // full re-fetch so every killmail in the window gets real item data
+    // instead of being skipped as "already known" with an empty list.
+    const ZK_CACHE_VERSION = 2;
     const zkFile = new URL("../zkill-cache.json", import.meta.url);
     let zk = {};
-    try { zk = JSON.parse(readFileSync(zkFile, "utf8")).kills || {}; } catch {}
-    // Normalize legacy [shipTypeId, dateStr] tuples to the richer shape.
-    for (const [id, rec] of Object.entries(zk)) {
-      if (Array.isArray(rec)) zk[id] = { s: rec[0], d: rec[1], items: [] };
-    }
+    try {
+      const raw = JSON.parse(readFileSync(zkFile, "utf8"));
+      if (raw.v === ZK_CACHE_VERSION) zk = raw.kills || {};
+    } catch {}
     const cutoff = Date.now() - 30 * 86400e3;
     const hardCutoff = Date.now() - 35 * 86400e3;
     for (const aid of Object.keys(ALLIANCES)) {
@@ -629,7 +633,7 @@ async function main() {
     for (const [id, rec] of Object.entries(zk)) {
       if (new Date(rec.d).getTime() < hardCutoff) delete zk[id];
     }
-    writeFileSync(zkFile, JSON.stringify({ kills: zk }));
+    writeFileSync(zkFile, JSON.stringify({ v: ZK_CACHE_VERSION, kills: zk }));
     const lossCount = {};
     const itemLossCount = {};
     for (const rec of Object.values(zk)) {
