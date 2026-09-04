@@ -181,7 +181,7 @@ input[type="checkbox"] { accent-color: var(--phosphor-dim); }
   flex-shrink: 0;
 }
 
-#min-value {
+#min-value, #qty-value {
   background: #04120a;
   border: 1px solid var(--border);
   color: var(--phosphor);
@@ -191,7 +191,8 @@ input[type="checkbox"] { accent-color: var(--phosphor-dim); }
   width: 110px;
   text-align: right;
 }
-#min-value:focus { outline: 1px solid var(--phosphor); }
+#qty-value { width: 80px; }
+#min-value:focus, #qty-value:focus { outline: 1px solid var(--phosphor); }
 
 .fbtn {
   background: #04120a;

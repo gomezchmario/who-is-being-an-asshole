@@ -29,18 +29,19 @@
     modules: new Set([7, 32]), // modules, rigs, subsystems
     fit: new Set([6, 7, 8, 18, 32, 87]), // union: "everything else" is the complement
   };
-  const filters = { min: true, cat: "all" };
+  const filters = { min: true, qty: false, qtyDir: "<", cat: "all" };
   const vFilter = new Set(); // empty = show every verdict
   let touched = false; // table stays empty until the visitor picks a filter
 
-  function minValue() {
-    const raw = ($("min-value").value || "").trim().toLowerCase().replace(/,/g, "");
+  function parseAmt(id, fallback) {
+    const raw = ($(id).value || "").trim().toLowerCase().replace(/,/g, "");
     const m = raw.match(/^([\d.]+)\s*([kmb])?$/);
-    if (!m) return 1_000_000;
+    if (!m) return fallback;
     const mult = { k: 1e3, m: 1e6, b: 1e9 }[m[2]] || 1;
     const v = parseFloat(m[1]) * mult;
-    return Number.isFinite(v) && v >= 0 ? v : 1_000_000;
+    return Number.isFinite(v) && v >= 0 ? v : fallback;
   }
+  const minValue = () => parseAmt("min-value", 1_000_000);
   let doctrineTypes = new Set();
   const sort = { key: "markup", dir: -1 };
 
@@ -48,6 +49,10 @@
     const q = $("search").value.trim().toLowerCase();
     if (q && !(o.name || "").toLowerCase().includes(q)) return false;
     if (filters.min && o.price < minValue()) return false;
+    if (filters.qty) {
+      const x = parseAmt("qty-value", 10);
+      if (filters.qtyDir === "<" ? o.volume < x : o.volume > x) return false;
+    }
     if (filters.cat === "all") return true;
     if (filters.cat === "doctrine") return doctrineTypes.has(o.type_id);
     if (filters.cat === "caps") return !!o.capital;
@@ -277,6 +282,17 @@
     });
   }
 
+  $("f-qty").addEventListener("click", () => {
+    filters.qty = !filters.qty;
+    $("f-qty").classList.toggle("on", filters.qty);
+    wake();
+  });
+  $("qty-dir").addEventListener("click", () => {
+    filters.qtyDir = filters.qtyDir === "<" ? ">" : "<";
+    $("qty-dir").innerHTML = filters.qtyDir === "<" ? "&lt;" : "&gt;";
+    wake();
+  });
+  $("qty-value").addEventListener("input", wake);
   $("search").addEventListener("input", wake);
   $("min-value").addEventListener("input", wake);
   $("threshold").addEventListener("input", wake);
