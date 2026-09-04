@@ -91,11 +91,18 @@
         th.dataset.key === sort.key ? (sort.dir === 1 ? " ▲" : " ▼") : " ·";
     }
 
+    const q = $("search").value.trim().toLowerCase();
+    const matchesQ = (c) => !q ||
+      (c.title || "").toLowerCase().includes(q) ||
+      (c.hull || "").toLowerCase().includes(q) ||
+      (c.issuer || "").toLowerCase().includes(q);
+
     const rows = [];
     let offenders = 0, judged = 0, unjudged = 0;
     for (const c of list) {
       if (filters.cat === "doctrine" && !c.doctrine) continue;
       if (filters.cat === "scalp" && !c.scalp) continue;
+      if (!matchesQ(c)) continue;
       if (c.markup == null) { unjudged++; continue; }
       judged++;
       const isOffender = Math.round(c.markup * 100) >= Math.round(threshold * 100) || !!c.scalp;
@@ -152,7 +159,9 @@
 
     const rows = [];
     let live = 0;
+    const q = $("search").value.trim().toLowerCase();
     for (const e of entries) {
+      if (q && !((e.title || "").toLowerCase().includes(q) || (e.hull || "").toLowerCase().includes(q) || (e.issuer || "").toLowerCase().includes(q))) continue;
       if (!e.gone) live++;
       const v = verdictFor(e.markup ?? 0, threshold);
       const gain = Math.round((e.price / e.scalp.paid - 1) * 100);
@@ -230,6 +239,7 @@
     });
   }
   $("threshold").addEventListener("input", render);
+  $("search").addEventListener("input", render);
   $("show-all").addEventListener("change", render);
   load();
 })();
