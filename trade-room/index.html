@@ -222,6 +222,7 @@
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
             <span class="flabel dim">VIEW</span>
+            <button id="ilp-kind" class="fbtn" data-kind="implants" title="Cycle: implants only → drugs only → both">IMPLANTS</button>
             <button id="ilp-scope" class="fbtn" title="Include every destroyed implant or drug, not just ones used in a tracked doctrine set/hardwiring — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
             <button id="ilp-all" class="fbtn" title="Show everything lost — clears the HIDE thresholds">CLEAR FILTERS</button>
             <button id="ilp-mode" class="fbtn" title="Group implants by set (grade + slot), hardwirings, and drugs separately, like the war room's missing-implants list">GROUP BY SET</button>
@@ -230,7 +231,7 @@
           <div class="frow">
             <span class="flabel dim">HIDE</span>
             <button id="ilp-f-lost" class="fbtn on" title="Hide items with fewer losses than this">LOST &lt;</button>
-            <input type="text" id="ilp-lost-min" value="8" spellcheck="false">
+            <input type="text" id="ilp-lost-min" value="3" spellcheck="false">
             <span class="sep dim">│</span>
             <button id="ilp-f-stock" class="fbtn on" title="Hide items already stocked for more than this many months">STOCK &gt;</button>
             <input type="text" id="ilp-stock-max" value="2" spellcheck="false">
@@ -596,7 +597,8 @@
     // shape and filter semantics as the ship-loss table above.
     const modState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true };
     const ammoState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true };
-    const impState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true };
+    const impState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true, kind: "implants" };
+    const IMP_KIND_CYCLE = ["implants", "drugs", "all"];
     const ilAmmoState = { grouped: false };
     const ilImpState = { grouped: false };
 
@@ -633,10 +635,10 @@
       return { key: "HARDWIRINGS", slot: null };
     }
 
-    function lossRows(cats, prefix, state) {
+    function lossRows(cats, prefix, state, extra = () => true) {
       const stockOf = new Map((data.items || []).map((i) => [i.id, i.xhq?.q || 0]));
       let entries = (data.itemLosses || [])
-        .filter((l) => cats.has(l.cat) && (state.scope === "all" || l.doctrine))
+        .filter((l) => cats.has(l.cat) && (state.scope === "all" || l.doctrine) && extra(l))
         .map((l) => {
           const stock = stockOf.get(l.id) || 0;
           const months = l.n ? stock / l.n : Infinity;
@@ -688,8 +690,11 @@
     }
 
     function renderImpTable() {
-      const entries = lossRows(CATSETS.imp, "ilp", impState);
-      const emptyRow = `<tr><td class="left dim" colspan="4">no ${impState.scope === "all" ? "" : "doctrine "}implant losses recorded yet</td></tr>`;
+      const kindFilter = impState.kind === "implants" ? (l) => !isDrugName(l.name)
+        : impState.kind === "drugs" ? (l) => isDrugName(l.name)
+        : () => true;
+      const entries = lossRows(CATSETS.imp, "ilp", impState, kindFilter);
+      const emptyRow = `<tr><td class="left dim" colspan="4">no ${impState.scope === "all" ? "" : "doctrine "}${impState.kind === "all" ? "implant/drug" : impState.kind} losses recorded yet</td></tr>`;
       if (!ilImpState.grouped) {
         $("il-imp-body").innerHTML = entries.map(itemLossRowHtml).join("") || emptyRow;
       } else {
@@ -999,6 +1004,11 @@
     $("ilp-mode").addEventListener("click", () => {
       ilImpState.grouped = !ilImpState.grouped;
       $("ilp-mode").classList.toggle("on", ilImpState.grouped);
+      renderImpTable();
+    });
+    $("ilp-kind").addEventListener("click", () => {
+      impState.kind = IMP_KIND_CYCLE[(IMP_KIND_CYCLE.indexOf(impState.kind) + 1) % IMP_KIND_CYCLE.length];
+      $("ilp-kind").textContent = impState.kind.toUpperCase();
       renderImpTable();
     });
     $("opp-scope").addEventListener("click", () => {
