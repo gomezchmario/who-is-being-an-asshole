@@ -1,21 +1,22 @@
 /* Fetches XHQ-7V structure market + Jita reference prices and writes data.json.
  * Runs in GitHub Actions on a schedule. Requires env vars:
- *   EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_REFRESH_TOKEN
+ *   EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_REFRESH_TOKEN, JANICE_API_KEY
  * (character needs docking access to the market structure and the
- *  esi-markets.structure_market_access.v1 scope)
+ *  esi-markets.structure_market_access.v1 scope; Janice keys are handed
+ *  out on the E-351 Discord — see README)
  */
 import { writeFileSync } from "node:fs";
 
 const SYSTEM_ID = 30003731; // XHQ-7V
 const REGION_ID = 10000047; // Providence
-const JITA_STATION = 60003760; // Jita IV - Moon 4 - Caldari Navy Assembly Plant
+const JANICE_MARKET = 2; // Jita 4-4
 const KNOWN_STRUCTURES = [1035949018593]; // Immortalis Fortizar
 const ESI = "https://esi.evetech.net/latest";
 const UA = "who-is-being-an-asshole (github.com self-hosted market tool)";
 
-const { EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_REFRESH_TOKEN } = process.env;
-if (!EVE_CLIENT_ID || !EVE_CLIENT_SECRET || !EVE_REFRESH_TOKEN) {
-  console.error("Missing EVE_CLIENT_ID / EVE_CLIENT_SECRET / EVE_REFRESH_TOKEN env vars.");
+const { EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_REFRESH_TOKEN, JANICE_API_KEY } = process.env;
+if (!EVE_CLIENT_ID || !EVE_CLIENT_SECRET || !EVE_REFRESH_TOKEN || !JANICE_API_KEY) {
+  console.error("Missing EVE_CLIENT_ID / EVE_CLIENT_SECRET / EVE_REFRESH_TOKEN / JANICE_API_KEY env vars.");
   process.exit(1);
 }
 
@@ -96,20 +97,22 @@ async function main() {
   console.log(`Structures: ${JSON.stringify(structures)}`);
   console.log(`Sell orders found: ${sells.length}`);
 
-  // 3. Jita reference prices from Fuzzwork aggregates (min sell at Jita 4-4).
+  // 3. Jita reference prices from Janice (min sell at Jita 4-4, falling
+  //    back to the 5-day median sell when Jita is momentarily out of stock).
   const typeIds = [...new Set(sells.map((o) => o.type_id))];
   const jita = {};
-  for (let i = 0; i < typeIds.length; i += 100) {
-    const chunk = typeIds.slice(i, i + 100);
-    const res = await fetch(
-      `https://market.fuzzwork.co.uk/aggregates/?station=${JITA_STATION}&types=${chunk.join(",")}`,
-      { headers: { "User-Agent": UA } }
-    );
-    if (!res.ok) throw new Error(`Fuzzwork HTTP ${res.status}`);
-    const agg = await res.json();
-    for (const [tid, v] of Object.entries(agg)) {
-      const min = Number(v?.sell?.min);
-      if (min > 0) jita[tid] = min;
+  for (let i = 0; i < typeIds.length; i += 500) {
+    const chunk = typeIds.slice(i, i + 500);
+    const res = await fetch(`https://janice.e-351.com/api/rest/v2/pricer?market=${JANICE_MARKET}`, {
+      method: "POST",
+      headers: { "X-ApiKey": JANICE_API_KEY, "Content-Type": "text/plain", "User-Agent": UA },
+      body: chunk.join("\n"),
+    });
+    if (!res.ok) throw new Error(`Janice HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    for (const item of await res.json()) {
+      const p = item?.immediatePrices;
+      const price = Number(p?.sellPrice) || Number(p?.sellPrice5DayMedian);
+      if (item?.itemType?.eid && price > 0) jita[item.itemType.eid] = price;
     }
   }
 
