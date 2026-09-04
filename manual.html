@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=26">
+  <link rel="stylesheet" href="style.css?v=27">
   <style>
     #paste {
       width: 100%; min-height: 220px; background: #04120a; border: 1px solid var(--border);
@@ -34,7 +34,7 @@
     <header>
       <div class="topline">
         <span>CONCORD MANUAL APPRAISAL TERMINAL // PROVIDENCE</span>
-        <span id="clock">--:--:--</span>
+        <span class="clock-wrap"><button id="settings-btn" class="gear-btn" title="Settings" aria-label="Settings">⚙</button><span class="dim">·</span><span id="clock">--:--:--</span></span>
       </div>
       <a class="market-btn nav-btn" href="contracts.html" title="Back to the contract gouging detector">◂ CONTRACTS</a>
       <h1 class="title">MANUAL <span class="red glitch">LOOKUP</span></h1>
@@ -212,5 +212,6 @@
   })();
   </script>
   <script data-goatcounter="https://xhq.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <script src="settings.js?v=27"></script>
 </body>
 </html>
