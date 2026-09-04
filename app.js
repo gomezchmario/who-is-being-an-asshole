@@ -31,6 +31,7 @@
   };
   const filters = { min: true, cat: "all" };
   const vFilter = new Set(); // empty = show every verdict
+  let touched = false; // table stays empty until the visitor picks a filter
 
   function minValue() {
     const raw = ($("min-value").value || "").trim().toLowerCase().replace(/,/g, "");
@@ -85,7 +86,21 @@
     return HONEST;
   }
 
+  function wake() {
+    touched = true;
+    render();
+  }
+
   function render() {
+    if (!touched) {
+      if (!data) return;
+      $("summary").innerHTML = '<span class="dim">▸ PICK A FILTER, A VERDICT, OR SEARCH AN ITEM TO SCAN THE MARKET ◂</span>';
+      $("results-body").replaceChildren();
+      $("scan-info").innerHTML =
+        `LAST SCAN: <b>${fmtAge(data.generated)}</b> · SYSTEM: <b>${escapeHtml(data.system || "XHQ-7V")}</b> · ${(data.orders || []).length} sell orders on file`;
+      $("results").classList.remove("hidden");
+      return;
+    }
     if (!data) return;
     const threshold = Math.max(0, Number($("threshold").value) || 30) / 100;
     const showAll = $("show-all").checked;
@@ -231,7 +246,7 @@
       for (const b of document.querySelectorAll(".vbtn")) {
         b.classList.toggle("on", b.dataset.v === "all" ? vFilter.size === 0 : vFilter.has(Number(b.dataset.v)));
       }
-      render();
+      wake();
     });
   }
 
@@ -239,7 +254,7 @@
     btn.addEventListener("click", () => {
       filters.cat = btn.dataset.cat;
       for (const b of document.querySelectorAll(".cbtn")) b.classList.toggle("on", b === btn);
-      render();
+      wake();
     });
   }
 
@@ -247,13 +262,13 @@
     th.addEventListener("click", () => {
       if (sort.key === th.dataset.key) sort.dir = -sort.dir;
       else { sort.key = th.dataset.key; sort.dir = th.dataset.key === "name" ? 1 : -1; }
-      render();
+      wake();
     });
   }
 
-  $("search").addEventListener("input", render);
-  $("min-value").addEventListener("input", render);
-  $("threshold").addEventListener("input", render);
-  $("show-all").addEventListener("change", render);
+  $("search").addEventListener("input", wake);
+  $("min-value").addEventListener("input", wake);
+  $("threshold").addEventListener("input", wake);
+  $("show-all").addEventListener("change", wake);
   load();
 })();
