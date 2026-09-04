@@ -139,6 +139,23 @@
           <td class="num">${isk(it.jita)}</td>
           <td class="num">${isk(it.amarr)}</td>
         </tr>`).join("");
+      // XHQ markup vs each hub, computed over the same item subset so the
+      // comparison stays fair when parts of the fit are missing locally.
+      const cmp = (refKey) => {
+        let x = 0, r = 0;
+        for (const it of f.items) {
+          if (!it.mkt || it[refKey] == null) continue;
+          x += it.mkt.min * it.qty;
+          r += it[refKey] * it.qty;
+        }
+        if (!r) return null;
+        const pct = Math.round((x / r - 1) * 100);
+        return `<b style="color:${pct > 0 ? "var(--red)" : "var(--phosphor)"}">${pct >= 0 ? "+" : ""}${pct}%</b>`;
+      };
+      const vsJita = cmp("jita"), vsAmarr = cmp("amarr");
+      const markupLine = (vsJita || vsAmarr)
+        ? `<div class="fitline">XHQ MARKUP: ${vsJita ? `vs JITA ${vsJita}` : ""}${vsJita && vsAmarr ? " · " : ""}${vsAmarr ? `vs AMARR ${vsAmarr}` : ""}${f.xhqPartial ? ' <span class="dim">(available items only)</span>' : ""}</div>`
+        : "";
       return `
         <div class="fitblock">
           <div class="fitname">${esc(f.t || f.hullName || "fit")}</div>
@@ -147,8 +164,8 @@
             <span>XHQ: <b>${isk(f.costXhq)}</b>${f.xhqPartial ? " ± (missing items excluded)" : ""}</span>
             <span>JITA: <b>${isk(f.costJita)}</b>${f.jitaPartial ? " ±" : ""}</span>
             <span>AMARR: <b>${isk(f.costAmarr)}</b>${f.amarrPartial ? " ±" : ""}</span>
-            ${!f.xhqPartial && f.costJita ? `<span class="dim">(XHQ is ${Math.round((f.costXhq / f.costJita - 1) * 100)}% vs Jita)</span>` : ""}
           </div>
+          ${markupLine}
           ${miss}
           ${contractRows(f.hull)}
           <details class="items"><summary>item breakdown</summary>
