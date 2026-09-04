@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="../style.css?v=2">
   <style>
     details.doctrine { border: 1px solid var(--border); background: var(--panel); margin-bottom: 10px; }
     details.doctrine > summary {
@@ -53,7 +53,7 @@
       </div>
       <h1 class="title">XHQ <span class="red glitch">WAR ROOM</span></h1>
       <p class="subtitle">▸ DOCTRINE READINESS BOARD ◂</p>
-      <p class="tagline">can we actually buy our doctrines at home? · unlisted page — share the link only with people you trust</p>
+      <p class="tagline">can we actually buy our doctrines at home? · unlisted page</p>
     </header>
 
     <section class="panel">
@@ -169,7 +169,7 @@
       }).join("");
     }
 
-    fetch("readiness.json", { cache: "no-cache" })
+    fetch("../readiness.json", { cache: "no-cache" })
       .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(render)
       .catch((e) => {
