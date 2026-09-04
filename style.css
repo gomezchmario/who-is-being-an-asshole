@@ -278,6 +278,17 @@ header { position: relative; }
 .blink { animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
+td.placeholder {
+  text-align: center;
+  padding: 34px 12px;
+  font-family: "VT323", monospace;
+  font-size: 22px;
+  letter-spacing: 0.06em;
+  color: var(--phosphor);
+  text-shadow: 0 0 8px rgba(51, 255, 102, 0.45);
+}
+tr:hover td.placeholder { background: none; }
+
 #search {
   background: #04120a;
   border: 1px solid var(--border);

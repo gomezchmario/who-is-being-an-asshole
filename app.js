@@ -86,16 +86,27 @@
     return HONEST;
   }
 
+  function syncButtons() {
+    for (const b of document.querySelectorAll(".cbtn")) {
+      b.classList.toggle("on", b.dataset.cat === filters.cat);
+    }
+    for (const b of document.querySelectorAll(".vbtn")) {
+      b.classList.toggle("on", b.dataset.v === "all" ? vFilter.size === 0 : vFilter.has(Number(b.dataset.v)));
+    }
+  }
+
   function wake() {
     touched = true;
+    syncButtons();
     render();
   }
 
   function render() {
     if (!touched) {
       if (!data) return;
-      $("summary").innerHTML = '<span class="dim">▸ PICK A FILTER, A VERDICT, OR SEARCH AN ITEM TO SCAN THE MARKET ◂</span>';
-      $("results-body").replaceChildren();
+      $("summary").innerHTML = "";
+      $("results-body").innerHTML =
+        '<tr><td colspan="6" class="placeholder">▸ PICK A FILTER, A VERDICT, OR SEARCH AN ITEM TO SCAN THE MARKET ◂</td></tr>';
       $("scan-info").innerHTML =
         `LAST SCAN: <b>${fmtAge(data.generated)}</b> · SYSTEM: <b>${escapeHtml(data.system || "XHQ-7V")}</b> · ${(data.orders || []).length} sell orders on file`;
       $("results").classList.remove("hidden");
