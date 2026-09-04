@@ -8,13 +8,16 @@
 
   const $ = (id) => document.getElementById(id);
 
+  // Ladder, highest first. CHEEKY's floor is the live threshold input.
   const VERDICTS = [
-    { min: -Infinity, label: "░ HONEST", cls: "v0", tier: 0 },
-    { min: 0.30,      label: "▒ CHEEKY", cls: "v1", tier: 1 },
-    { min: 0.50,      label: "▓ DICK", cls: "v2", tier: 2 },
-    { min: 1.00,      label: "█ ASSHOLE", cls: "v3", tier: 3 },
-    { min: 2.00,      label: "█ GALACTIC ASSHOLE", cls: "v4", tier: 4 },
+    { min: 2.00, label: "█ GALACTIC ASSHOLE", cls: "v5", tier: 5 },
+    { min: 1.00, label: "█ ASSHOLE", cls: "v4", tier: 4 },
+    { min: 0.75, label: "▓ DICK", cls: "v3", tier: 3 },
+    { min: 0.50, label: "▓ JERK", cls: "v2", tier: 2 },
+    { min: null, label: "▒ CHEEKY", cls: "v1", tier: 1 },
   ];
+  const SAINT = { label: "★ SAINT", cls: "v6", tier: 6 };
+  const HONEST = { label: "░ HONEST", cls: "v0", tier: 0 };
 
   let data = null;
 
@@ -27,6 +30,7 @@
     fit: new Set([6, 7, 8, 18, 32, 87]), // union: "everything else" is the complement
   };
   const filters = { min: true, cat: "all" };
+  const vFilter = new Set(); // empty = show every verdict
 
   function minValue() {
     const raw = ($("min-value").value || "").trim().toLowerCase().replace(/,/g, "");
@@ -72,14 +76,11 @@
   }
 
   function verdictFor(markup, threshold) {
-    // The user-set threshold defines the honest/cheeky line; the harsher
-    // tiers stay at fixed markups so the labels keep meaning.
-    let v = VERDICTS[0];
+    if (markup <= -0.15) return SAINT;
     for (const cand of VERDICTS) {
-      const min = cand.tier === 1 ? threshold : cand.min;
-      if (markup >= min) v = cand;
+      if (markup >= (cand.min ?? threshold)) return cand;
     }
-    return v;
+    return HONEST;
   }
 
   function render() {
@@ -118,6 +119,7 @@
       if (!isOffender && !showAll) continue;
 
       const v = verdictFor(o.markup, threshold);
+      if (vFilter.size && !vFilter.has(v.tier)) continue;
       const tr = document.createElement("tr");
       tr.className = "tier" + v.tier;
       const structName = structNames[o.location_id] || "structure " + o.location_id;
@@ -217,6 +219,20 @@
     $("f-min").classList.toggle("on", filters.min);
     render();
   });
+  for (const btn of document.querySelectorAll(".vbtn")) {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.v === "all") vFilter.clear();
+      else {
+        const t = Number(btn.dataset.v);
+        vFilter.has(t) ? vFilter.delete(t) : vFilter.add(t);
+      }
+      for (const b of document.querySelectorAll(".vbtn")) {
+        b.classList.toggle("on", b.dataset.v === "all" ? vFilter.size === 0 : vFilter.has(Number(b.dataset.v)));
+      }
+      render();
+    });
+  }
+
   for (const btn of document.querySelectorAll(".cbtn")) {
     btn.addEventListener("click", () => {
       filters.cat = btn.dataset.cat;

@@ -149,11 +149,39 @@ async function main() {
     ? [...new Set(Object.values(doctrineData.fits).flatMap((f) => f.i.map((x) => x[0])))]
     : [];
 
+  // 2d. Industry inputs for the trade room: minerals, fuel, capital
+  //     components, common PI goods. Resolved by name so no ids go stale.
+  const INDUSTRY_NAMES = [
+    "Tritanium", "Pyerite", "Mexallon", "Isogen", "Nocxium", "Zydrine", "Megacyte", "Morphite",
+    "Helium Isotopes", "Hydrogen Isotopes", "Oxygen Isotopes", "Nitrogen Isotopes",
+    "Liquid Ozone", "Heavy Water", "Strontium Clathrates",
+    "Amarr Fuel Block", "Caldari Fuel Block", "Gallente Fuel Block", "Minmatar Fuel Block",
+    "Capital Armor Plates", "Capital Capacitor Battery", "Capital Cargo Bay", "Capital Computer System",
+    "Capital Construction Parts", "Capital Corporate Hangar Bay", "Capital Doomsday Weapon Mount",
+    "Capital Drone Bay", "Capital Jump Drive", "Capital Launcher Hardpoint", "Capital Power Generator",
+    "Capital Propulsion Engine", "Capital Sensor Cluster", "Capital Shield Emitter",
+    "Capital Ship Maintenance Bay", "Capital Turret Hardpoint",
+    "Coolant", "Robotics", "Construction Blocks", "Mechanical Parts", "Consumer Electronics",
+    "Oxygen", "Water", "Enriched Uranium", "Guidance Systems", "Transmitter",
+    "Reactive Metals", "Precious Metals", "Toxic Metals", "Silicate Glass",
+    "Superconductors", "Rocket Fuel", "Synthetic Oil", "Electrolytes", "Nanites",
+  ];
+  const industryIds = [];
+  {
+    const res = await esiJson(`${ESI}/universe/ids/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(INDUSTRY_NAMES),
+    });
+    for (const t of res.json?.inventory_types || []) industryIds.push(t.id);
+  }
+
   // 3. Jita reference prices from Janice (min sell at Jita 4-4, falling
   //    back to the 5-day median sell when Jita is momentarily out of stock).
   const contractTypeIds = Object.values(itemsCache).flatMap((items) => items.map((i) => i[0]));
-  const typeIds = [...new Set([...sells.map((o) => o.type_id), ...contractTypeIds, ...doctrineTypeIds])];
+  const typeIds = [...new Set([...sells.map((o) => o.type_id), ...contractTypeIds, ...doctrineTypeIds, ...industryIds])];
   const jita = {};
+  const vols = {}; // packaged m³ per type, from Janice
   for (let i = 0; i < typeIds.length; i += 500) {
     const chunk = typeIds.slice(i, i + 500);
     const res = await fetch(`https://janice.e-351.com/api/rest/v2/pricer?market=${JANICE_MARKET}`, {
@@ -166,13 +194,16 @@ async function main() {
       const p = item?.immediatePrices;
       const price = Number(p?.sellPrice) || Number(p?.sellPrice5DayMedian);
       if (item?.itemType?.eid && price > 0) jita[item.itemType.eid] = price;
+      const v = Number(item?.itemType?.packagedVolume) || Number(item?.itemType?.volume);
+      if (item?.itemType?.eid && v > 0) vols[item.itemType.eid] = v;
     }
   }
 
-  // 3a. Amarr prices (Janice market 115) — only needed for doctrine items.
+  // 3a. Amarr prices (Janice market 115) — doctrine + industry items.
   const amarr = {};
-  for (let i = 0; i < doctrineTypeIds.length; i += 500) {
-    const chunk = doctrineTypeIds.slice(i, i + 500);
+  const amarrIds = [...new Set([...doctrineTypeIds, ...industryIds])];
+  for (let i = 0; i < amarrIds.length; i += 500) {
+    const chunk = amarrIds.slice(i, i + 500);
     const res = await fetch(`https://janice.e-351.com/api/rest/v2/pricer?market=115`, {
       method: "POST",
       headers: { "X-ApiKey": JANICE_API_KEY, "Content-Type": "text/plain", "User-Agent": UA },
@@ -459,6 +490,81 @@ async function main() {
       missingImplants: missingBy([20]),
     }));
     console.log(`Wrote readiness.json: ${doctrines.length} doctrines.`);
+
+    // 8. Trade room: alliance losses from zKillboard (30 days, cached) +
+    //    consolidated per-type supply data.
+    const ALLIANCES = { 1988009451: "CVA", 99010240: "CVAA" };
+    const zkFile = new URL("../zkill-cache.json", import.meta.url);
+    let zk = {};
+    try { zk = JSON.parse(readFileSync(zkFile, "utf8")).kills || {}; } catch {}
+    const cutoff = Date.now() - 30 * 86400e3;
+    const hardCutoff = Date.now() - 35 * 86400e3;
+    for (const aid of Object.keys(ALLIANCES)) {
+      pages: for (let p = 1; p <= 8; p++) {
+        let page;
+        try {
+          const res = await fetch(`https://zkillboard.com/api/losses/allianceID/${aid}/page/${p}/`, {
+            headers: { "User-Agent": UA + " (killboard: doctrine loss tracking)" },
+          });
+          if (!res.ok) break;
+          page = await res.json();
+        } catch { break; }
+        if (!Array.isArray(page) || !page.length) break;
+        let sawKnown = false;
+        for (const km of page) {
+          if (zk[km.killmail_id]) { sawKnown = true; continue; }
+          const t = new Date(km.killmail_time).getTime();
+          if (t < hardCutoff) break pages;
+          if (km.victim?.ship_type_id) zk[km.killmail_id] = [km.victim.ship_type_id, km.killmail_time.slice(0, 10)];
+        }
+        if (sawKnown) break;
+        await new Promise((r) => setTimeout(r, 1100)); // be polite to zkill
+      }
+    }
+    for (const [id, [, d]] of Object.entries(zk)) {
+      if (new Date(d).getTime() < hardCutoff) delete zk[id];
+    }
+    writeFileSync(zkFile, JSON.stringify({ kills: zk }));
+    const lossCount = {};
+    for (const [ship, d] of Object.values(zk)) {
+      if (new Date(d).getTime() >= cutoff) lossCount[ship] = (lossCount[ship] || 0) + 1;
+    }
+    const unknownShipIds = Object.keys(lossCount).map(Number).filter((id) => !names[id]);
+    if (unknownShipIds.length) {
+      const res = await esiJson(`${ESI}/universe/names/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(unknownShipIds),
+      });
+      for (const n of res.json || []) names[n.id] = n.name;
+    }
+    const losses = Object.entries(lossCount)
+      .map(([id, n]) => ({ id: +id, name: names[id] || `type ${id}`, n, cat: catCache[id]?.[1] ?? null, doctrine: doctrineShips.has(+id) ? 1 : 0 }))
+      .sort((a, b) => b.n - a.n);
+
+    const tradeIds = [...new Set([...doctrineTypeIds, ...industryIds])];
+    const tradeItems = tradeIds.map((tid) => {
+      const m = xhqMkt[tid];
+      return {
+        id: tid,
+        name: names[tid] || `type ${tid}`,
+        cat: catCache[tid]?.[1] ?? null,
+        vol: vols[tid] ?? null,
+        jita: jita[tid] ?? null,
+        amarr: amarr[tid] ?? null,
+        xhq: m ? { q: m.q, min: m.min } : null,
+        fits: usedTypes.get(tid) || 0,
+        ...(industryIds.includes(tid) && { ind: 1 }),
+        ...(lossCount[tid] && { lost: lossCount[tid] }),
+      };
+    });
+    writeFileSync(new URL("../trade.json", import.meta.url), JSON.stringify({
+      generated: new Date().toISOString(),
+      system: "XHQ-7V",
+      items: tradeItems,
+      losses,
+    }));
+    console.log(`Wrote trade.json: ${tradeItems.length} types, ${losses.length} ship loss types (${Object.values(lossCount).reduce((a, b) => a + b, 0)} losses/30d).`);
   }
 }
 

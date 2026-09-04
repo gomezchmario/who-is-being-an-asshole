@@ -8,12 +8,14 @@
   const $ = (id) => document.getElementById(id);
 
   const VERDICTS = [
-    { min: -Infinity, label: "░ HONEST", cls: "v0", tier: 0 },
-    { min: 0.30,      label: "▒ CHEEKY", cls: "v1", tier: 1 },
-    { min: 0.50,      label: "▓ DICK", cls: "v2", tier: 2 },
-    { min: 1.00,      label: "█ ASSHOLE", cls: "v3", tier: 3 },
-    { min: 2.00,      label: "█ GALACTIC ASSHOLE", cls: "v4", tier: 4 },
+    { min: 2.00, label: "█ GALACTIC ASSHOLE", cls: "v5", tier: 5 },
+    { min: 1.00, label: "█ ASSHOLE", cls: "v4", tier: 4 },
+    { min: 0.75, label: "▓ DICK", cls: "v3", tier: 3 },
+    { min: 0.50, label: "▓ JERK", cls: "v2", tier: 2 },
+    { min: null, label: "▒ CHEEKY", cls: "v1", tier: 1 },
   ];
+  const SAINT = { label: "★ SAINT", cls: "v6", tier: 6 };
+  const HONEST = { label: "░ HONEST", cls: "v0", tier: 0 };
 
   let data = null;
   let scalpLog = null; // {entries: {id: {...}}}
@@ -44,12 +46,11 @@
   }
 
   function verdictFor(markup, threshold) {
-    let v = VERDICTS[0];
+    if (markup <= -0.15) return SAINT;
     for (const cand of VERDICTS) {
-      const min = cand.tier === 1 ? threshold : cand.min;
-      if (markup >= min) v = cand;
+      if (markup >= (cand.min ?? threshold)) return cand;
     }
-    return v;
+    return HONEST;
   }
 
   function escapeHtml(s) {

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XHQ TRADE ROOM</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css?v=4">
+  <style>
+    details.doctrine { border: 1px solid var(--border); background: var(--panel); margin-bottom: 10px; }
+    details.doctrine > summary {
+      cursor: pointer; list-style: none; padding: 10px 14px;
+      font-family: "VT323", monospace; font-size: 22px; letter-spacing: 0.04em;
+      color: var(--amber);
+    }
+    details.doctrine > summary::before { content: "▸ "; }
+    details.doctrine[open] > summary::before { content: "▾ "; }
+    details.doctrine > summary:hover { background: rgba(51, 255, 102, 0.06); }
+    .inner { padding: 4px 14px 12px; }
+    .cost-grid { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+    .cost-grid label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--phosphor-dim); }
+    .cost-grid input {
+      background: #04120a; border: 1px solid var(--border); color: var(--phosphor);
+      font-family: inherit; font-size: 14px; padding: 3px 6px; width: 90px; text-align: right;
+    }
+    .cost-grid input:focus { outline: 1px solid var(--phosphor); }
+    .derived { margin-top: 8px; font-size: 14px; color: var(--phosphor); }
+    .derived b { color: var(--amber); }
+    .fleetline { margin-top: 6px; font-size: 12px; color: var(--phosphor-faint); }
+    .tr-table { width: 100%; font-size: 13px; min-width: 760px; }
+    .searchbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 0 0 8px; }
+    #q {
+      background: #04120a; border: 1px solid var(--border); color: var(--phosphor);
+      font-family: inherit; font-size: 14px; padding: 4px 8px; width: 220px;
+    }
+    .profit-pos { color: var(--phosphor); font-weight: bold; }
+    .profit-neg { color: var(--red); }
+    .demandtag { font-size: 11px; border: 1px solid; padding: 0 3px; letter-spacing: 0.05em; white-space: nowrap; }
+    .d-miss { color: var(--red); border-color: var(--red); }
+    .d-low { color: var(--amber); border-color: var(--amber); }
+    .d-fit { color: var(--phosphor-dim); border-color: var(--phosphor-faint); }
+    .d-lost { color: #c86bff; border-color: #c86bff; }
+    .note { font-size: 13px; color: var(--phosphor-dim); line-height: 1.55; }
+    .note b { color: var(--amber); }
+    .advice li { margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <div class="crt" aria-hidden="true"></div>
+
+  <main class="terminal">
+    <header>
+      <div class="topline">
+        <span>CVA LOGISTICS COMMAND // PROFIT DIVISION</span>
+        <span id="clock">--:--:--</span>
+      </div>
+      <a class="market-btn nav-btn" href="../war-room/" title="Doctrine readiness board">◂ WAR ROOM</a>
+      <h1 class="title">XHQ <span class="red glitch">TRADE ROOM</span></h1>
+      <p class="subtitle">▸ SUPPLY THE FORT · SKIM THE CREAM ◂</p>
+      <p class="tagline">WHERE THE ISK IS: BUY IN JITA, HAUL IT HOME, PRICE IT HONESTLY-ISH · UNLISTED PAGE</p>
+    </header>
+
+    <section class="panel">
+      <div class="row spread wrap">
+        <span id="scan-info" class="dim">ESTABLISHING UPLINK<span class="blink">…</span></span>
+      </div>
+    </section>
+
+    <section id="status" class="log"></section>
+
+    <!-- COST MODEL -->
+    <details class="doctrine" open>
+      <summary>LOGISTICS &amp; TAX MODEL</summary>
+      <div class="inner">
+        <div class="cost-grid">
+          <label>Ark isotopes / LY <input id="p-isoly" type="text" value="4,500"></label>
+          <label>route LY (round trip) <input id="p-ly" type="text" value="30"></label>
+          <label>isotope price <input id="p-isoprice" type="text" value="auto"></label>
+          <label>other cost / trip <input id="p-flat" type="text" value="20,000,000" title="Freighter leg Jita→staging, courier fees, risk buffer"></label>
+          <label>Ark cargo m³ <input id="p-cap" type="text" value="285,000"></label>
+        </div>
+        <div class="cost-grid" style="margin-top:10px">
+          <label>haul rate ISK/m³ <input id="p-haul" type="text" value="auto" title="Override the computed rate, or leave 'auto'"></label>
+          <label>broker fee % <input id="p-broker" type="text" value="1.0"></label>
+          <label>sales tax % <input id="p-tax" type="text" value="4.48"></label>
+          <label>margin on unstocked items % <input id="p-margin" type="text" value="25" title="Sell price over Jita for items XHQ doesn't stock at all"></label>
+        </div>
+        <div class="derived" id="derived">…</div>
+        <div class="fleetline">FLEET: Ark (jump) · Obelisk ~435k m³ (highsec leg) · 8× Gallente DST ≈ 500k m³ combined (nullsec-capable, good for implants/drugs/crystals) — settings save in this browser</div>
+      </div>
+    </details>
+
+    <!-- LOSSES -->
+    <details class="doctrine" open>
+      <summary>DOCTRINE SHIPS DYING (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
+      <div class="inner">
+        <div class="tablewrap"><table class="tr-table" id="loss-table">
+          <thead><tr>
+            <th class="left sortable">SHIP<span class="arrow"></span></th>
+            <th class="num sortable">LOST / 30D<span class="arrow"></span></th>
+            <th class="num sortable">XHQ HULLS<span class="arrow"></span></th>
+            <th class="num sortable">CONTRACTS<span class="arrow"></span></th>
+            <th class="num sortable" title="(market hulls + contracts) / losses per month">MONTHS OF STOCK<span class="arrow"></span></th>
+          </tr></thead>
+          <tbody id="loss-body"></tbody>
+        </table></div>
+        <p class="note" style="margin-bottom:0">Red = the Fort holds less than one month of replacements. That is where hulls sell themselves.</p>
+      </div>
+    </details>
+
+    <!-- OPPORTUNITIES -->
+    <details class="doctrine" open>
+      <summary>SUPPLY OPPORTUNITIES — PROFIT AFTER HAULING &amp; TAX</summary>
+      <div class="inner">
+        <div class="searchbar">
+          <input id="q" type="text" placeholder="filter items…" spellcheck="false">
+          <button class="fbtn cbtn on" data-f="all">ALL</button>
+          <button class="fbtn cbtn" data-f="miss">MISSING / UNSTOCKED</button>
+          <button class="fbtn cbtn" data-f="ammo">AMMO+DRONES</button>
+          <button class="fbtn cbtn" data-f="mods">MODULES</button>
+          <button class="fbtn cbtn" data-f="ships">SHIPS</button>
+          <button class="fbtn cbtn" data-f="imp">IMPLANTS</button>
+          <button class="fbtn cbtn" data-f="ind">INDUSTRY</button>
+        </div>
+        <div class="tablewrap"><table class="tr-table" id="opp-table">
+          <thead><tr>
+            <th class="left sortable">ITEM<span class="arrow"></span></th>
+            <th class="left">DEMAND</th>
+            <th class="num sortable">XHQ STOCK<span class="arrow"></span></th>
+            <th class="num sortable">SELL @<span class="arrow"></span></th>
+            <th class="num sortable">JITA<span class="arrow"></span></th>
+            <th class="num sortable">m³<span class="arrow"></span></th>
+            <th class="num sortable">PROFIT/U<span class="arrow"></span></th>
+            <th class="num sortable">PROFIT/m³<span class="arrow"></span></th>
+            <th class="num sortable" title="profit / (Jita cost + haul)">ROI<span class="arrow"></span></th>
+          </tr></thead>
+          <tbody id="opp-body"></tbody>
+        </table></div>
+        <p class="note" style="margin-bottom:0">SELL @ = current XHQ min − 0.1% undercut, or Jita + your margin when nothing is stocked. Profit is per unit after Jita purchase, hauling, broker fee and sales tax. Rows cap at 400 — use the filters.</p>
+      </div>
+    </details>
+
+    <!-- MANUFACTURING -->
+    <details class="doctrine">
+      <summary>MANUFACTURING IDEAS — CHEAP TO SET UP</summary>
+      <div class="inner">
+        <div class="tablewrap"><table class="tr-table" id="mfg-table">
+          <thead><tr>
+            <th class="left">ITEM</th>
+            <th class="left">XHQ STATUS</th>
+            <th class="num">JITA</th>
+            <th class="left">SETUP</th>
+          </tr></thead>
+          <tbody id="mfg-body"></tbody>
+        </table></div>
+        <p class="note">Ranked doctrine consumables that are unstocked or heavily marked up. <b>T1</b> = one cheap BPO + minerals, running within a day; build in-structure and skip the hauling cost entirely. <b>T2</b> = needs invention (datacores, decryptors, T1 input) — profitable but a real production line. Evergreen easy wins: <b>T1 ammo &amp; drones</b> the doctrines chew through, <b>cap booster charges</b>, <b>fuel blocks</b> (Fort eats them daily and inputs are half PI anyway), and <b>Nanite Repair Paste</b> if you run PI. Minerals for all of this compress well — one DST of compressed ore feeds a week of production.</p>
+      </div>
+    </details>
+
+    <!-- STRATEGY -->
+    <details class="doctrine">
+      <summary>STANDING ORDERS — HOW TO PRINT ISK WITHOUT BEING THE ASSHOLE</summary>
+      <div class="inner note">
+        <ul class="advice">
+          <li><b>Own the gaps first.</b> Anything MISSING sells at whatever you list it for — your margin setting is the only competition. That's the polite monopoly.</li>
+          <li><b>Restock what dies.</b> The losses table is a pre-order list: hulls with under a month of stock get bought the night after a bad fleet.</li>
+          <li><b>Match cargo to value.</b> Ark hauls the bulk (hulls, ammo by the million); DSTs carry the dense ISK — implants, drugs, crystals — a full implant restock fits in one DST with room for regret.</li>
+          <li><b>Undercut the assholes, not yourself.</b> Price just under the gougers and you win every sale while still landing 20-40% over Jita. The main page shows you exactly who to undercut.</li>
+          <li><b>Watch your own scalp log.</b> If your cheap contracts start getting flipped, raise prices — the market is telling you the fair price is higher.</li>
+          <li><b>Fuel and minerals are the quiet compounding play.</b> Nobody brags about fuel blocks; the structure burns them regardless of content patches.</li>
+        </ul>
+      </div>
+    </details>
+
+    <footer>
+      <p class="credit">▸ Liked this app? Send ISK. Want your own? Contact <span class="amber">Levhitor</span> in-game. ◂</p>
+      <p class="dim small">data: EVE ESI + Janice + zKillboard (CVA &amp; CVAA losses) · XHQ = Immortalis Fortizar · auto-updates every ~30 min</p>
+    </footer>
+  </main>
+
+  <script>
+  (() => {
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+
+    function tickClock() { $("clock").textContent = new Date().toISOString().slice(11, 19) + " EVE"; }
+    setInterval(tickClock, 1000); tickClock();
+
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    function isk(n) {
+      if (n == null || !isFinite(n)) return "—";
+      const a = Math.abs(n);
+      if (a >= 1e9) return (n / 1e9).toFixed(2) + "B";
+      if (a >= 1e6) return (n / 1e6).toFixed(1) + "M";
+      if (a >= 1e3) return Math.round(n).toLocaleString("en-US");
+      return n.toFixed(a < 10 ? 2 : 0);
+    }
+    function age(iso) {
+      const m = Math.round((Date.now() - new Date(iso)) / 60000);
+      return m < 60 ? m + " min ago" : Math.floor(m / 60) + "h " + (m % 60) + "m ago";
+    }
+    const num = (s, fb) => {
+      const v = parseFloat(String(s).replace(/,/g, ""));
+      return isFinite(v) ? v : fb;
+    };
+
+    let data = null, contracts = null;
+    let isoJita = null; // Helium Isotopes Jita price, from trade data
+    const filter = { f: "all", q: "" };
+
+    // --- cost model, persisted per browser ---
+    const PKEYS = ["p-isoly", "p-ly", "p-isoprice", "p-flat", "p-cap", "p-haul", "p-broker", "p-tax", "p-margin"];
+    try {
+      const saved = JSON.parse(localStorage.getItem("traderoom") || "{}");
+      for (const k of PKEYS) if (saved[k] != null) $(k).value = saved[k];
+    } catch {}
+    function saveParams() {
+      try {
+        const o = {};
+        for (const k of PKEYS) o[k] = $(k).value;
+        localStorage.setItem("traderoom", JSON.stringify(o));
+      } catch {}
+    }
+
+    function model() {
+      const isoPrice = $("p-isoprice").value.trim().toLowerCase() === "auto" ? (isoJita || 900) : num($("p-isoprice").value, 900);
+      const fuel = num($("p-isoly").value, 4500) * num($("p-ly").value, 30) * isoPrice;
+      const tripCost = fuel + num($("p-flat").value, 2e7);
+      const cap = Math.max(1, num($("p-cap").value, 285000));
+      const autoHaul = tripCost / cap;
+      const haul = $("p-haul").value.trim().toLowerCase() === "auto" ? autoHaul : num($("p-haul").value, autoHaul);
+      return {
+        haul,
+        autoHaul,
+        tripCost,
+        fees: (num($("p-broker").value, 1) + num($("p-tax").value, 4.48)) / 100,
+        margin: num($("p-margin").value, 25) / 100,
+        isoPrice,
+      };
+    }
+
+    function attachSort(table, defaultCol, render) {
+      const ths = [...table.querySelectorAll("th.sortable")];
+      ths.forEach((th) => th.addEventListener("click", () => {
+        const idx = [...table.querySelectorAll("th")].indexOf(th);
+        const dir = th.dataset.dir === "desc" ? 1 : -1;
+        ths.forEach((t) => { delete t.dataset.dir; const a = t.querySelector(".arrow"); if (a) a.textContent = " ·"; });
+        th.dataset.dir = dir === 1 ? "asc" : "desc";
+        th.querySelector(".arrow").textContent = dir === 1 ? " ▲" : " ▼";
+        const tbody = table.querySelector("tbody");
+        [...tbody.rows].sort((a, b) => {
+          const va = a.cells[idx]?.dataset.v, vb = b.cells[idx]?.dataset.v;
+          const na = parseFloat(va), nb = parseFloat(vb);
+          return dir * (isNaN(na) || isNaN(nb) ? String(va).localeCompare(String(vb)) : na - nb);
+        }).forEach((r) => tbody.appendChild(r));
+      }));
+    }
+
+    function renderLosses() {
+      const conByHull = new Map();
+      for (const c of contracts?.contracts || []) {
+        if (c.hull_id) conByHull.set(c.hull_id, (conByHull.get(c.hull_id) || 0) + 1);
+      }
+      const stockOf = new Map((data.items || []).map((i) => [i.id, i.xhq?.q || 0]));
+      const rows = (data.losses || []).filter((l) => l.doctrine).map((l) => {
+        const hulls = stockOf.get(l.id) || 0;
+        const cons = conByHull.get(l.id) || 0;
+        const months = l.n ? (hulls + cons) / l.n : Infinity;
+        const bad = months < 1;
+        return `<tr class="${bad ? "tier3" : ""}">
+          <td class="left" data-v="${esc(l.name)}">${esc(l.name)}${bad ? ' <span class="demandtag d-miss">RESTOCK</span>' : ""}</td>
+          <td class="num" data-v="${l.n}">${l.n}</td>
+          <td class="num" data-v="${hulls}">${hulls}</td>
+          <td class="num" data-v="${cons}">${cons}</td>
+          <td class="num" data-v="${isFinite(months) ? months.toFixed(1) : 999}">${isFinite(months) ? months.toFixed(1) : "∞"}</td>
+        </tr>`;
+      }).join("");
+      $("loss-body").innerHTML = rows || '<tr><td class="left dim" colspan="5">no doctrine losses recorded yet — killboard history builds up with each scan</td></tr>';
+    }
+
+    const CATSETS = {
+      ammo: new Set([8, 18, 87]),
+      mods: new Set([7, 32]),
+      ships: new Set([6]),
+      imp: new Set([20]),
+    };
+
+    function passes(it) {
+      if (filter.q && !it.name.toLowerCase().includes(filter.q)) return false;
+      switch (filter.f) {
+        case "miss": return !it.xhq;
+        case "ind": return !!it.ind;
+        case "ammo": case "mods": case "ships": case "imp": return CATSETS[filter.f].has(it.cat);
+        default: return true;
+      }
+    }
+
+    function renderOpps() {
+      const m = model();
+      $("derived").innerHTML =
+        `JUMP TRIP ≈ <b>${isk(m.tripCost)}</b> ISK (iso @ ${isk(m.isoPrice)}) · HAUL RATE ≈ <b>${m.haul.toFixed(0)}</b> ISK/m³` +
+        ($("p-haul").value.trim().toLowerCase() === "auto" ? "" : ` <span class="dim">(override; auto would be ${m.autoHaul.toFixed(0)})</span>`) +
+        ` · FEES ON SALE: <b>${(m.fees * 100).toFixed(2)}%</b>`;
+
+      const rows = [];
+      const list = (data.items || [])
+        .filter((it) => it.jita != null && it.vol != null && passes(it))
+        .map((it) => {
+          const sell = it.xhq ? it.xhq.min * 0.999 : it.jita * (1 + m.margin);
+          const haul = it.vol * m.haul;
+          const profit = sell * (1 - m.fees) - it.jita - haul;
+          const pm3 = profit / it.vol;
+          const roi = profit / (it.jita + haul);
+          return { it, sell, profit, pm3, roi };
+        })
+        .sort((a, b) => b.pm3 - a.pm3)
+        .slice(0, 400);
+      for (const { it, sell, profit, pm3, roi } of list) {
+        const tags = [];
+        if (!it.xhq) tags.push('<span class="demandtag d-miss">MISSING</span>');
+        if (it.lost) tags.push(`<span class="demandtag d-lost">${it.lost} LOST/30D</span>`);
+        if (it.fits) tags.push(`<span class="demandtag d-fit">${it.fits} FIT${it.fits > 1 ? "S" : ""}</span>`);
+        if (it.ind) tags.push('<span class="demandtag d-low">INDUSTRY</span>');
+        const pcls = profit > 0 ? "profit-pos" : "profit-neg";
+        rows.push(`<tr>
+          <td class="left" data-v="${esc(it.name)}">${esc(it.name)}</td>
+          <td class="left">${tags.join(" ")}</td>
+          <td class="num" data-v="${it.xhq?.q || 0}">${it.xhq ? it.xhq.q.toLocaleString("en-US") : "—"}</td>
+          <td class="num" data-v="${sell}">${isk(sell)}</td>
+          <td class="num" data-v="${it.jita}">${isk(it.jita)}</td>
+          <td class="num" data-v="${it.vol}">${it.vol}</td>
+          <td class="num ${pcls}" data-v="${profit}">${isk(profit)}</td>
+          <td class="num ${pcls}" data-v="${pm3}">${isk(pm3)}</td>
+          <td class="num ${pcls}" data-v="${isFinite(roi) ? roi : -9}">${isFinite(roi) ? Math.round(roi * 100) + "%" : "—"}</td>
+        </tr>`);
+      }
+      $("opp-body").innerHTML = rows.join("") || '<tr><td class="left dim" colspan="9">nothing matches</td></tr>';
+    }
+
+    function renderMfg() {
+      const m = model();
+      const T2RE = /\bII\b/;
+      const FACTION = /Navy|Fleet|Imperial|Republic|Federation|Caldari|Dread|Arch |Guristas|Sanshas|True |Shadow|Domination|'/;
+      const cands = (data.items || [])
+        .filter((it) => [8, 18].includes(it.cat) && it.jita != null)
+        .map((it) => {
+          const missing = !it.xhq;
+          const markup = it.xhq && it.jita ? it.xhq.min / it.jita - 1 : null;
+          return { it, missing, markup };
+        })
+        .filter((x) => x.missing || (x.markup != null && x.markup >= 0.25))
+        .sort((a, b) => (b.missing ? 9 : b.markup) - (a.missing ? 9 : a.markup))
+        .slice(0, 30);
+      $("mfg-body").innerHTML = cands.map(({ it, missing, markup }) => {
+        const t2 = T2RE.test(it.name);
+        const faction = FACTION.test(it.name);
+        const setup = faction ? '<span class="dim">LP store / import only — not buildable</span>'
+          : t2 ? '<span class="d-low demandtag">T2</span> <span class="dim">invention line needed</span>'
+          : '<span class="ok-inline" style="color:var(--phosphor)">T1 — BPO + minerals, running in a day</span>';
+        return `<tr>
+          <td class="left">${esc(it.name)}</td>
+          <td class="left">${missing ? '<span class="demandtag d-miss">MISSING</span>' : `<b style="color:var(--red)">+${Math.round(markup * 100)}%</b> over Jita`}</td>
+          <td class="num">${isk(it.jita)}</td>
+          <td class="left">${setup}</td>
+        </tr>`;
+      }).join("") || '<tr><td class="left dim" colspan="4">no candidates right now</td></tr>';
+    }
+
+    function renderAll() {
+      if (!data) return;
+      renderLosses();
+      renderOpps();
+      renderMfg();
+      const totalLost = (data.losses || []).filter((l) => l.doctrine).reduce((s, l) => s + l.n, 0);
+      $("scan-info").innerHTML = `LAST SCAN: <b>${age(data.generated)}</b> · SYSTEM: <b>${esc(data.system)}</b> · ${data.items.length} tracked types · ${totalLost} doctrine hulls lost in 30d`;
+    }
+
+    Promise.all([
+      fetch("../trade.json", { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
+      fetch("../contracts.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([t, c]) => {
+      data = t; contracts = c;
+      isoJita = t.items.find((i) => i.name === "Helium Isotopes")?.jita || null;
+      $("status").textContent = "";
+      renderAll();
+    }).catch((e) => {
+      $("status").innerHTML = `<span class="err">NO TRADE DATA YET (${esc(e.message)}). Run the update workflow once trade.json support is deployed.</span>`;
+      $("scan-info").textContent = "AWAITING FIRST SCAN";
+    });
+
+    for (const k of PKEYS) $(k).addEventListener("input", () => { saveParams(); renderOpps(); });
+    for (const b of document.querySelectorAll(".cbtn")) {
+      b.addEventListener("click", () => {
+        filter.f = b.dataset.f;
+        for (const x of document.querySelectorAll(".cbtn")) x.classList.toggle("on", x === b);
+        renderOpps();
+      });
+    }
+    $("q").addEventListener("input", () => { filter.q = $("q").value.trim().toLowerCase(); renderOpps(); });
+    attachSort($("opp-table"));
+    attachSort($("loss-table"));
+  })();
+  </script>
+</body>
+</html>
