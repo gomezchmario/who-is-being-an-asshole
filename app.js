@@ -33,6 +33,7 @@
     fit: new Set([6, 7, 8, 18, 32, 87]), // union: "everything else" is the complement
   };
   const filters = { min: true, minDir: "<", minMode: "unit", qty: false, qtyDir: "<", cat: "all" };
+  let orderMode = "all"; // all | cheapest | priciest — how many rows per item survive
   const vFilter = new Set(); // empty = show every verdict
   let touched = false; // table stays empty until the visitor picks a filter
   const flipped = new Set(); // type_ids whose AVG reference is flipped to Jita
@@ -150,8 +151,7 @@
     let offenders = 0;
     let judged = 0;
 
-    const orders = (data.orders || []).slice();
-    orders.sort((a, b) => {
+    const sortCmp = (a, b) => {
       if (sort.key === "name") {
         return sort.dir * (a.name || "").localeCompare(b.name || "");
       }
@@ -160,16 +160,32 @@
       else if (sort.key === "jita") { va = effOf(a).ref; vb = effOf(b).ref; }
       else { va = a[sort.key]; vb = b[sort.key]; }
       return sort.dir * ((va ?? -Infinity) - (vb ?? -Infinity));
-    });
+    };
+    const orders = (data.orders || []).slice();
+    orders.sort(sortCmp);
     for (const th of document.querySelectorAll("th.sortable")) {
       th.querySelector(".arrow").textContent =
         th.dataset.key === sort.key ? (sort.dir === 1 ? " ▲" : " ▼") : " ·";
     }
 
     let noJita = 0;
+    let candidates = [];
     for (const o of orders) {
       if (o.jita == null || o.markup == null) { noJita++; continue; } // nothing to judge against
       if (!passesFilters(o)) continue;
+      candidates.push(o);
+    }
+    if (orderMode !== "all") {
+      const byType = new Map();
+      for (const o of candidates) {
+        const best = byType.get(o.type_id);
+        if (!best || (orderMode === "cheapest" ? o.price < best.price : o.price > best.price)) {
+          byType.set(o.type_id, o);
+        }
+      }
+      candidates = [...byType.values()].sort(sortCmp);
+    }
+    for (const o of candidates) {
       judged++;
       const eff = effOf(o);
       const isOffender = Math.round(eff.markup * 100) >= Math.round(threshold * 100);
@@ -345,6 +361,13 @@
     render();
   });
   $("search").addEventListener("input", wake);
+  for (const b of document.querySelectorAll(".obtn")) {
+    b.addEventListener("click", () => {
+      orderMode = b.dataset.mode;
+      for (const x of document.querySelectorAll(".obtn")) x.classList.toggle("on", x === b);
+      wake();
+    });
+  }
   $("min-value").addEventListener("input", wake);
   $("threshold").addEventListener("input", wake);
   $("show-all").addEventListener("change", wake);
