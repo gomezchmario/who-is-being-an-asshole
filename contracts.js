@@ -77,9 +77,10 @@
     let offenders = 0, judged = 0, unjudged = 0;
     for (const c of list) {
       if (filters.cat === "doctrine" && !c.doctrine) continue;
+      if (filters.cat === "scalp" && !c.scalp) continue;
       if (c.markup == null) { unjudged++; continue; }
       judged++;
-      const isOffender = c.markup >= threshold;
+      const isOffender = c.markup >= threshold || !!c.scalp;
       if (isOffender) offenders++;
       if (!isOffender && !showAll) continue;
 
@@ -87,13 +88,17 @@
       const tr = document.createElement("tr");
       tr.className = "tier" + v.tier;
       const label = c.title || c.hull || `contract ${c.id}`;
-      const sub = [c.hull && c.hull !== c.title ? c.hull : null, `${c.items} items`]
+      let sub = [c.hull && c.hull !== c.title ? c.hull : null, `${c.items} items`]
         .filter(Boolean).join(" · ");
+      if (c.scalp) {
+        const gain = Math.round((c.price / c.scalp.paid - 1) * 100);
+        sub = `SCALPED — bought from ${c.scalp.from} for ${fmtIsk(c.scalp.paid)}, relisted +${gain}% · ` + sub;
+      }
       tr.innerHTML = `
         <td class="left ${v.cls}"><span class="verdict">${v.label}</span></td>
         <td class="left">
-          <span class="itemname">${escapeHtml(label)}</span>${c.doctrine ? ' <span class="galtag" title="Contains a CVA doctrine ship">DOCTRINE</span>' : ""}
-          <span class="struct">${escapeHtml(sub)}</span>
+          <span class="itemname">${escapeHtml(label)}</span>${c.doctrine ? ' <span class="galtag" title="Contains a CVA doctrine ship">DOCTRINE</span>' : ""}${c.scalp ? ' <span class="scalptag" title="Same physical item bought cheaper and relisted">SCALP</span>' : ""}
+          <span class="struct${c.scalp ? " scalpline" : ""}">${escapeHtml(sub)}</span>
         </td>
         <td class="left"><a class="itemname" href="https://zkillboard.com/search/${encodeURIComponent(c.issuer)}/" target="_blank" rel="noopener">${escapeHtml(c.issuer)}</a></td>
         <td class="num">${fmtIsk(c.price)}</td>

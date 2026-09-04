@@ -123,20 +123,23 @@ async function main() {
   }
   const itemsCacheFile = new URL("../contract-items.json", import.meta.url);
   let itemsCache = {};
-  try { itemsCache = JSON.parse(readFileSync(itemsCacheFile, "utf8")); } catch {}
+  try {
+    const raw = JSON.parse(readFileSync(itemsCacheFile, "utf8"));
+    if (raw._v === 2) { delete raw._v; itemsCache = raw; }
+  } catch {}
   const newContracts = contractsRaw.filter((c) => itemsCache[c.contract_id] == null);
   await inBatches(newContracts, 15, async (c) => {
     const res = await esiJson(`${ESI}/contracts/public/items/${c.contract_id}/`);
     if (res.error) { itemsCache[c.contract_id] = []; return; }
-    // [type_id, quantity, included(1/0), bpc(1/0)]
+    // [type_id, quantity, included(1/0), bpc(1/0), item_id(0 if none)]
     itemsCache[c.contract_id] = (res.json || []).map((i) => [
-      i.type_id, i.quantity, i.is_included ? 1 : 0, i.is_blueprint_copy ? 1 : 0,
+      i.type_id, i.quantity, i.is_included ? 1 : 0, i.is_blueprint_copy ? 1 : 0, i.item_id || 0,
     ]);
   });
   // Prune expired/completed contracts from the cache.
   const liveIds = new Set(contractsRaw.map((c) => String(c.contract_id)));
   for (const k of Object.keys(itemsCache)) if (!liveIds.has(k)) delete itemsCache[k];
-  writeFileSync(itemsCacheFile, JSON.stringify(itemsCache));
+  writeFileSync(itemsCacheFile, JSON.stringify({ _v: 2, ...itemsCache }));
   console.log(`Contracts at structures: ${contractsRaw.length} (${newContracts.length} newly fetched).`);
 
   // 3. Jita reference prices from Janice (min sell at Jita 4-4, falling
@@ -250,6 +253,40 @@ async function main() {
     doctrineShips = new Set(d.types.filter((t) => catCache[t]?.[1] === 6));
   } catch {}
   const refPrice = (tid) => jita[tid] ?? galaxy[tid] ?? null;
+
+  // Scalper detection. Assembled items keep their unique item_id across
+  // trades, so if a contract vanished before its expiry (presumed sold) and
+  // one of its physical items reappears in a newer, pricier contract from a
+  // different character, that's a relist — a scalp. History is built by this
+  // job over time (contracts-history.json); detection starts working as
+  // contracts churn.
+  const histFile = new URL("../contracts-history.json", import.meta.url);
+  let hist = {};
+  try { hist = JSON.parse(readFileSync(histFile, "utf8")).contracts || {}; } catch {}
+  const nowIso = new Date().toISOString();
+  const goneIndex = new Map(); // item_id -> [historical cid, ...]
+  for (const [cid, h] of Object.entries(hist)) {
+    if (liveIds.has(cid)) continue;
+    // Vanished well before expiry -> sold (or withdrawn), not lapsed.
+    if (new Date(h.e) - new Date(h.t) < 2 * 3600e3) continue;
+    for (const iid of h.ids || []) {
+      if (!goneIndex.has(iid)) goneIndex.set(iid, []);
+      goneIndex.get(iid).push(cid);
+    }
+  }
+  function findScalp(c, included, issuerName) {
+    let best = null;
+    for (const [, , , , iid] of included) {
+      if (!iid) continue;
+      for (const cid of goneIndex.get(iid) || []) {
+        const h = hist[cid];
+        if (h.i === issuerName || c.price <= h.p) continue;
+        if (!best || h.t > best.t) best = h;
+      }
+    }
+    return best ? { from: best.i, paid: best.p } : null;
+  }
+
   const contracts = contractsRaw.map((c) => {
     const items = itemsCache[c.contract_id] || [];
     const included = items.filter((i) => i[2]);
@@ -263,10 +300,12 @@ async function main() {
     }
     const swap = items.some((i) => !i[2]);
     const markup = !swap && value > 0 ? c.price / value - 1 : null;
+    const issuerName = names[c.issuer_id] || String(c.issuer_id);
+    const scalp = findScalp(c, included, issuerName);
     return {
       id: c.contract_id,
       title: c.title || "",
-      issuer: names[c.issuer_id] || String(c.issuer_id),
+      issuer: issuerName,
       price: c.price,
       value: value || null,
       markup,
@@ -277,16 +316,34 @@ async function main() {
       ...(doctrine && { doctrine: 1 }),
       ...(unpriced && { est: 1 }),
       ...(swap && { swap: 1 }),
+      ...(scalp && { scalp }),
     };
   });
   contracts.sort((a, b) => (b.markup ?? -Infinity) - (a.markup ?? -Infinity));
+
+  // Update history with what's live now; drop entries stale for 60+ days.
+  for (const c of contractsRaw) {
+    const items = itemsCache[c.contract_id] || [];
+    hist[c.contract_id] = {
+      p: c.price,
+      i: names[c.issuer_id] || String(c.issuer_id),
+      e: c.date_expired,
+      t: nowIso,
+      ids: items.filter((i) => i[2] && i[4]).map((i) => i[4]),
+    };
+  }
+  for (const [cid, h] of Object.entries(hist)) {
+    if (Date.now() - new Date(h.t) > 60 * 86400e3) delete hist[cid];
+  }
+  writeFileSync(histFile, JSON.stringify({ contracts: hist }));
   writeFileSync(new URL("../contracts.json", import.meta.url), JSON.stringify({
     generated: new Date().toISOString(),
     system: "XHQ-7V",
     contracts,
   }));
   const cOff = contracts.filter((x) => x.markup >= 0.2).length;
-  console.log(`Wrote contracts.json: ${contracts.length} contracts, ${cOff} assholes, ${contracts.filter((x) => x.doctrine).length} doctrine-ship contracts.`);
+  console.log(`Wrote contracts.json: ${contracts.length} contracts, ${cOff} assholes, ` +
+    `${contracts.filter((x) => x.doctrine).length} doctrine-ship, ${contracts.filter((x) => x.scalp).length} scalps.`);
 }
 
 main().catch((e) => {

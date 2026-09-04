@@ -295,6 +295,24 @@ th.sortable .arrow { color: var(--amber); }
   padding: 0 3px;
   letter-spacing: 0.06em;
 }
+
+.scalptag {
+  color: var(--red);
+  font-size: 11px;
+  border: 1px solid var(--red);
+  padding: 0 3px;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 6px rgba(255, 59, 59, 0.5);
+}
+.struct.scalpline { color: var(--red); opacity: 0.85; }
+
+.fbtn.scalper { border-color: var(--red); color: var(--red); }
+.fbtn.scalper:hover { color: #ff7a7a; border-color: #ff7a7a; }
+.fbtn.scalper.on {
+  background: var(--red);
+  color: #1a0404;
+  box-shadow: 0 0 10px rgba(255, 59, 59, 0.5);
+}
 th.left, td.left { text-align: left; }
 th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
