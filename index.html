@@ -36,6 +36,19 @@
       </div>
     </section>
 
+    <section class="panel filters">
+      <div class="row wrap">
+        <span class="dim">FILTERS:</span>
+        <button id="f-min" class="fbtn on" title="Hide orders whose total value (price × qty) is under 1,000,000 ISK">HIDE &lt; 1M ISK</button>
+        <span class="sep">│</span>
+        <button class="fbtn cbtn on" data-cat="all">ALL</button>
+        <button class="fbtn cbtn" data-cat="ammo">AMMO+DRONES</button>
+        <button class="fbtn cbtn" data-cat="ships">SHIPS</button>
+        <button class="fbtn cbtn" data-cat="fit">FIT ITEMS</button>
+        <button class="fbtn cbtn" data-cat="nonfit">EVERYTHING ELSE</button>
+      </div>
+    </section>
+
     <section id="status" class="log"></section>
 
     <section id="results" class="hidden">

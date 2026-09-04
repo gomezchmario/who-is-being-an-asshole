@@ -164,6 +164,29 @@ input[type="number"] {
 input[type="number"]:focus { outline: 1px solid var(--phosphor); }
 input[type="checkbox"] { accent-color: var(--phosphor-dim); }
 
+/* --- filter buttons --- */
+.filters .sep { color: var(--phosphor-faint); }
+
+.fbtn {
+  background: #04120a;
+  border: 1px solid var(--border);
+  color: var(--phosphor-dim);
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-shadow: none;
+}
+.fbtn:hover { color: var(--phosphor); border-color: var(--phosphor); }
+.fbtn.on {
+  background: var(--phosphor-dim);
+  color: #02120a;
+  border-color: var(--phosphor);
+  font-weight: bold;
+  box-shadow: 0 0 10px rgba(51, 255, 102, 0.35);
+}
+
 /* --- status log --- */
 .log {
   font-size: 14px;

@@ -5,7 +5,7 @@
  *  esi-markets.structure_markets.v1 scope; Janice keys are handed
  *  out on the E-351 Discord — see README)
  */
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 
 const SYSTEM_ID = 30003731; // XHQ-7V
 const REGION_ID = 10000047; // Providence
@@ -52,6 +52,12 @@ async function getAccessToken() {
   });
   if (!res.ok) throw new Error(`SSO token refresh failed: HTTP ${res.status}: ${await res.text()}`);
   return (await res.json()).access_token;
+}
+
+async function inBatches(items, size, fn) {
+  for (let i = 0; i < items.length; i += size) {
+    await Promise.all(items.slice(i, i + size).map(fn));
+  }
 }
 
 async function fetchPaginated(url, headers) {
@@ -119,6 +125,28 @@ async function main() {
     }
   }
 
+  // 3b. Item categories (for the frontend filters), via ESI type -> group ->
+  //     category. Cached in type-cats.json so each run only looks up new types.
+  const catCacheFile = new URL("../type-cats.json", import.meta.url);
+  let catCache = {};
+  try { catCache = JSON.parse(readFileSync(catCacheFile, "utf8")); } catch {}
+  const unknownTypes = typeIds.filter((t) => catCache[t] == null);
+  const typeGroups = {};
+  await inBatches(unknownTypes, 20, async (tid) => {
+    const res = await esiJson(`${ESI}/universe/types/${tid}/`);
+    if (!res.error) typeGroups[tid] = res.json.group_id;
+  });
+  const groupCats = {};
+  await inBatches([...new Set(Object.values(typeGroups))], 20, async (gid) => {
+    const res = await esiJson(`${ESI}/universe/groups/${gid}/`);
+    if (!res.error) groupCats[gid] = res.json.category_id;
+  });
+  for (const [tid, gid] of Object.entries(typeGroups)) {
+    if (groupCats[gid] != null) catCache[tid] = groupCats[gid];
+  }
+  writeFileSync(catCacheFile, JSON.stringify(catCache));
+  console.log(`Categorized ${unknownTypes.length} new types (cache now ${Object.keys(catCache).length}).`);
+
   // 4. Type names.
   const names = {};
   for (let i = 0; i < typeIds.length; i += 900) {
@@ -142,6 +170,7 @@ async function main() {
       markup: j ? o.price / j - 1 : null,
       volume: o.volume_remain,
       location_id: String(o.location_id),
+      cat: catCache[o.type_id] ?? null,
     };
   });
   orders.sort((a, b) => (b.markup ?? -Infinity) - (a.markup ?? -Infinity));

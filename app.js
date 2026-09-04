@@ -17,6 +17,24 @@
 
   let data = null;
 
+  // EVE inventory category ids: 6 Ship, 7 Module, 8 Charge (ammo), 18 Drone,
+  // 32 Subsystem, 87 Fighter.
+  const CATS = {
+    ammo: new Set([8, 18]),
+    ships: new Set([6]),
+    fit: new Set([6, 7, 8, 18, 32, 87]),
+  };
+  const MIN_VALUE = 1_000_000;
+  const filters = { min: true, cat: "all" };
+
+  function passesFilters(o) {
+    if (filters.min && o.price * o.volume < MIN_VALUE) return false;
+    if (filters.cat === "all") return true;
+    if (o.cat == null) return filters.cat === "nonfit";
+    if (filters.cat === "nonfit") return !CATS.fit.has(o.cat);
+    return CATS[filters.cat].has(o.cat);
+  }
+
   // --- EVE-style clock (UTC) ---
   function tickClock() {
     const now = new Date();
@@ -64,8 +82,10 @@
     const orders = (data.orders || []).slice();
     orders.sort((a, b) => (b.markup ?? -Infinity) - (a.markup ?? -Infinity));
 
+    let noJita = 0;
     for (const o of orders) {
-      if (o.jita == null || o.markup == null) continue; // nothing to judge against
+      if (o.jita == null || o.markup == null) { noJita++; continue; } // nothing to judge against
+      if (!passesFilters(o)) continue;
       judged++;
       const isOffender = o.markup >= threshold;
       if (isOffender) offenders++;
@@ -99,10 +119,9 @@
         ` <span class="dim">(&ge;${Math.round(threshold * 100)}% over Jita)</span>`;
     }
 
-    const unjudged = (data.orders || []).length - judged;
     $("scan-info").innerHTML =
       `LAST SCAN: <b>${fmtAge(data.generated)}</b> · SYSTEM: <b>${escapeHtml(data.system || "XHQ-7V")}</b>` +
-      (unjudged > 0 ? ` · <span class="dim">${unjudged} orders skipped (no Jita price)</span>` : "");
+      (noJita > 0 ? ` · <span class="dim">${noJita} orders skipped (no Jita price)</span>` : "");
 
     $("results").classList.remove("hidden");
   }
@@ -149,16 +168,30 @@
       system: "XHQ-7V",
       structures: { "1035949018593": "XHQ-7V - Immortalis Fortizar" },
       orders: [
-        { type_id: 44992, name: "Ishtar", price: 412000000, jita: 318000000, volume: 3, location_id: "1035949018593", markup: 0.2956 },
-        { type_id: 2048,  name: "Damage Control II", price: 2100000, jita: 690000, volume: 14, location_id: "1035949018593", markup: 2.0435 },
-        { type_id: 12058, name: "Nanite Repair Paste", price: 38000, jita: 30500, volume: 5000, location_id: "1035949018593", markup: 0.2459 },
-        { type_id: 3841,  name: "Large Shield Extender II", price: 1310000, jita: 1240000, volume: 22, location_id: "1035949018593", markup: 0.0565 },
-        { type_id: 16273, name: "Liquid Ozone", price: 890, jita: 410, volume: 250000, location_id: "1035949018593", markup: 1.1707 },
-        { type_id: 24700, name: "Myrmidon", price: 92000000, jita: 58000000, volume: 1, location_id: "1035949018593", markup: 0.5862 },
-        { type_id: 31716, name: "Medium Core Defense Field Extender I", price: 3400000, jita: 2900000, volume: 8, location_id: "1035949018593", markup: 0.1724 },
-        { type_id: 27361, name: "Caldari Navy Antimatter Charge M", price: 480, jita: 455, volume: 120000, location_id: "1035949018593", markup: 0.0549 },
+        { type_id: 44992, name: "Ishtar", price: 412000000, jita: 318000000, volume: 3, location_id: "1035949018593", markup: 0.2956, cat: 6 },
+        { type_id: 2048,  name: "Damage Control II", price: 2100000, jita: 690000, volume: 14, location_id: "1035949018593", markup: 2.0435, cat: 7 },
+        { type_id: 12058, name: "Nanite Repair Paste", price: 38000, jita: 30500, volume: 5000, location_id: "1035949018593", markup: 0.2459, cat: 8 },
+        { type_id: 3841,  name: "Large Shield Extender II", price: 1310000, jita: 1240000, volume: 22, location_id: "1035949018593", markup: 0.0565, cat: 7 },
+        { type_id: 16273, name: "Liquid Ozone", price: 890, jita: 410, volume: 250000, location_id: "1035949018593", markup: 1.1707, cat: 4 },
+        { type_id: 24700, name: "Myrmidon", price: 92000000, jita: 58000000, volume: 1, location_id: "1035949018593", markup: 0.5862, cat: 6 },
+        { type_id: 31716, name: "Medium Core Defense Field Extender I", price: 3400000, jita: 2900000, volume: 8, location_id: "1035949018593", markup: 0.1724, cat: 7 },
+        { type_id: 27361, name: "Caldari Navy Antimatter Charge M", price: 480, jita: 455, volume: 120000, location_id: "1035949018593", markup: 0.0549, cat: 8 },
+        { type_id: 12608, name: "Hobgoblin II", price: 690000, jita: 310000, volume: 45, location_id: "1035949018593", markup: 1.2258, cat: 18 },
       ],
     };
+  }
+
+  $("f-min").addEventListener("click", () => {
+    filters.min = !filters.min;
+    $("f-min").classList.toggle("on", filters.min);
+    render();
+  });
+  for (const btn of document.querySelectorAll(".cbtn")) {
+    btn.addEventListener("click", () => {
+      filters.cat = btn.dataset.cat;
+      for (const b of document.querySelectorAll(".cbtn")) b.classList.toggle("on", b === btn);
+      render();
+    });
   }
 
   $("threshold").addEventListener("input", render);
