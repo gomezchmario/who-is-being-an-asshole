@@ -2,7 +2,9 @@ name: update market data
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    # Offset from :00/:30 — GitHub silently drops crons that fire on the
+    # stampede minutes.
+    - cron: "7,37 * * * *"
   workflow_dispatch:
 
 permissions:
