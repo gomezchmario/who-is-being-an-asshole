@@ -188,11 +188,23 @@
 
     <!-- BUY ORDER BOUNTIES -->
     <details class="doctrine" open>
-      <summary>BUY ORDER BOUNTIES — FILL XHQ BUY ORDERS FOR PROFIT</summary>
+      <summary>BUY ORDER BOUNTIES</summary>
       <div class="inner">
-        <div class="frow" style="padding-top:0">
-          <span class="flabel dim">COSTS</span>
-          <button id="buy-nohaul" class="fbtn on" title="Treat hauling as free — e.g. filling orders with stock you already have on site, or topping off a haul you were making anyway">IGNORE HAULING</button>
+        <div class="fgrid" style="margin-bottom:8px">
+          <div class="frow" style="padding-top:0">
+            <span class="flabel dim">COSTS</span>
+            <button id="buy-nohaul" class="fbtn on" title="Treat hauling as free — e.g. filling orders with stock you already have on site, or topping off a haul you were making anyway">IGNORE HAULING</button>
+          </div>
+          <div class="frow">
+            <span class="flabel dim">HIDE</span>
+            <button id="buy-pm3" class="fbtn" title="Hide fills earning less than this per m³ hauled">PROFIT/m³ &lt;</button>
+            <input type="text" id="buy-pm3-min" value="1,000" spellcheck="false">
+            <span class="dim">ISK</span>
+            <span class="sep dim">│</span>
+            <button id="buy-total" class="fbtn on" title="Hide fills whose total profit is below this">TOTAL &lt;</button>
+            <input type="text" id="buy-total-min" value="10,000,000" spellcheck="false">
+            <span class="dim">ISK</span>
+          </div>
         </div>
         <div class="tablewrap"><table class="tr-table" id="buy-table">
           <thead><tr>
@@ -206,7 +218,6 @@
           </tr></thead>
           <tbody id="buy-body"></tbody>
         </table></div>
-        <p class="note" style="margin-bottom:0">Standing buy orders across the system's structures, matched against the cheapest way to fill them — XHQ's own sell orders (no hauling) or Jita/Amarr plus your haul rate. Filling a buy order pays sales tax but no broker fee. Only profitable fills shown.</p>
       </div>
     </details>
 
@@ -495,7 +506,7 @@
     }
 
     // Buy orders across XHQ structures vs the cheapest way to fill them.
-    const buyState = { noHaul: true };
+    const buyState = { noHaul: true, hidePm3: false, hideTotal: true };
     function renderBuys() {
       const m = model();
       const tax = num($("p-tax").value, 4.48) / 100;
@@ -514,9 +525,12 @@
           const [src, cost] = cands[0];
           const profit = b.p * (1 - tax) - cost;
           const total = profit * b.q;
-          return { it, b, src, cost, profit, total };
+          const pm3 = profit / it.vol;
+          return { it, b, src, cost, profit, total, pm3 };
         })
         .filter((x) => x && x.profit > 0)
+        .filter((x) => !buyState.hidePm3 || x.pm3 >= num($("buy-pm3-min").value, 1000))
+        .filter((x) => !buyState.hideTotal || x.total >= num($("buy-total-min").value, 10000000))
         .sort((a, c) => c.total - a.total)
         .slice(0, 50);
       $("buy-body").innerHTML = rows.map(({ it, b, src, cost, profit, total }) => `
@@ -634,6 +648,18 @@
       $("buy-nohaul").classList.toggle("on", buyState.noHaul);
       renderBuys();
     });
+    $("buy-pm3").addEventListener("click", () => {
+      buyState.hidePm3 = !buyState.hidePm3;
+      $("buy-pm3").classList.toggle("on", buyState.hidePm3);
+      renderBuys();
+    });
+    $("buy-pm3-min").addEventListener("input", renderBuys);
+    $("buy-total").addEventListener("click", () => {
+      buyState.hideTotal = !buyState.hideTotal;
+      $("buy-total").classList.toggle("on", buyState.hideTotal);
+      renderBuys();
+    });
+    $("buy-total-min").addEventListener("input", renderBuys);
     // Losses table: custom sort handlers (column click returns to flat mode).
     {
       const KEYS = ["name", "n", "hulls", "cons", "months"];
