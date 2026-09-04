@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WHO IS BEING AN ASSHOLE? — MANUAL LOOKUP</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💢</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=21">
+  <style>
+    #paste {
+      width: 100%; min-height: 220px; background: #04120a; border: 1px solid var(--border);
+      color: var(--phosphor); font-family: "Share Tech Mono", monospace; font-size: 13px;
+      padding: 10px; resize: vertical;
+    }
+    #paste:focus { outline: 1px solid var(--phosphor); }
+    .askrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+    #asking {
+      background: #04120a; border: 1px solid var(--border); color: var(--phosphor);
+      font-family: inherit; font-size: 15px; padding: 5px 8px; width: 160px; text-align: right;
+    }
+    #verdict-box { font-family: "VT323", monospace; font-size: 26px; }
+    .totalrow td { border-top: 1px solid var(--border); font-weight: bold; color: var(--phosphor); }
+    .unknown td { color: var(--amber); }
+  </style>
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <div class="crt" aria-hidden="true"></div>
+
+  <main class="terminal">
+    <header>
+      <div class="topline">
+        <span>CONCORD MANUAL APPRAISAL TERMINAL // PROVIDENCE</span>
+        <span id="clock">--:--:--</span>
+      </div>
+      <a class="market-btn nav-btn" href="contracts.html" title="Back to the contract gouging detector">◂ CONTRACTS</a>
+      <h1 class="title">MANUAL <span class="red glitch">LOOKUP</span></h1>
+      <p class="subtitle">▸ PASTE A CONTRACT · GET A VERDICT ◂</p>
+      <p class="tagline">ESI can't see alliance-assigned contracts — but you can. In game: open the contract, select the items (CTRL+A), copy, paste here.</p>
+    </header>
+
+    <section class="panel">
+      <textarea id="paste" spellcheck="false" placeholder="Paste contract contents here, e.g.:
+ Republic Fleet EMP S	1,200	Projectile Ammo	Charge	Cargo Hold
+ Sabre	1	Interdictor	Ship
+ Warp Scrambler II	1	Warp Scrambler	Module	Medium Slot"></textarea>
+      <div class="askrow">
+        <button id="go" class="fbtn big" style="font-size:15px;padding:8px 18px">▶ APPRAISE</button>
+        <span class="sep dim">│</span>
+        <label class="dim">CONTRACT ASKING PRICE</label>
+        <input type="text" id="asking" placeholder="e.g. 250m" spellcheck="false">
+        <span class="dim">ISK</span>
+      </div>
+      <div id="verdict-box"></div>
+    </section>
+
+    <section id="status" class="log"></section>
+
+    <section id="results" class="hidden">
+      <div class="tablewrap">
+        <table>
+          <thead><tr>
+            <th class="left">ITEM</th>
+            <th class="num">QTY</th>
+            <th class="num">JITA / U</th>
+            <th class="num">JITA TOTAL</th>
+            <th class="num">AMARR / U</th>
+            <th class="num">AMARR TOTAL</th>
+          </tr></thead>
+          <tbody id="body"></tbody>
+        </table>
+      </div>
+      <p class="dim small">Prices: Jita 4-4 and Amarr VIII min sell (live from Fuzzwork, with the site's own data as first stop). Unknown or unpriceable lines show in amber and count as zero.</p>
+    </section>
+
+    <footer>
+      <p class="dim small">unofficial · not affiliated with CCP Games · verdicts use the same ladder as the contracts page (threshold 30%)</p>
+    </footer>
+  </main>
+
+  <script>
+  (() => {
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    function tickClock() { $("clock").textContent = new Date().toISOString().slice(11, 19) + " EVE"; }
+    setInterval(tickClock, 1000); tickClock();
+
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const isk = (n) => n == null ? "—" : n >= 1e9 ? (n / 1e9).toFixed(2) + "B" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : Math.round(n).toLocaleString("en-US");
+    function parseAmt(s) {
+      const m = String(s || "").trim().toLowerCase().replace(/,/g, "").match(/^([\d.]+)\s*([kmb])?$/);
+      if (!m) return null;
+      return parseFloat(m[1]) * ({ k: 1e3, m: 1e6, b: 1e9 }[m[2]] || 1);
+    }
+
+    const VERDICTS = [
+      { min: 200, label: "█ GALACTIC ASSHOLE", cls: "v5" },
+      { min: 100, label: "█ ASSHOLE", cls: "v4" },
+      { min: 75,  label: "▓ DICK", cls: "v3" },
+      { min: 50,  label: "▓ JERK", cls: "v2" },
+      { min: 30,  label: "▒ CHEEKY", cls: "v1" },
+      { min: 19,  label: "▒ SUS", cls: "v9" },
+    ];
+    function verdictFor(pct) {
+      if (pct <= -15) return { label: "█ SAINT", cls: "v6" };
+      if (pct <= -7) return { label: "▒ SUPPORTER", cls: "v7" };
+      if (pct <= 0) return { label: "░ LOCAL", cls: "v8" };
+      for (const v of VERDICTS) if (pct >= v.min) return v;
+      return { label: "░ HONEST", cls: "v0" };
+    }
+
+    // First stop: the site's own tracked prices; misses fall back to
+    // ESI name resolution + Fuzzwork live aggregates.
+    let byName = new Map();
+    fetch("trade.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).then((t) => {
+      for (const it of t?.items || []) byName.set(it.name.toLowerCase(), { jita: it.jita, amarr: it.amarr });
+    }).catch(() => {});
+
+    function parsePaste(text) {
+      const agg = new Map();
+      for (const line of text.split("\n")) {
+        const parts = line.split("\t");
+        const name = (parts[0] || "").trim();
+        if (!name) continue;
+        const qty = parseInt((parts[1] || "1").replace(/[,.\s]/g, ""), 10) || 1;
+        agg.set(name, (agg.get(name) || 0) + qty);
+      }
+      return agg;
+    }
+
+    async function resolveMissing(names) {
+      const out = new Map();
+      if (!names.length) return out;
+      try {
+        const idsRes = await fetch("https://esi.evetech.net/latest/universe/ids/", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(names.slice(0, 500)),
+        }).then((r) => r.json());
+        const found = idsRes.inventory_types || [];
+        const idOf = new Map(found.map((t) => [t.id, t.name]));
+        const ids = found.map((t) => t.id);
+        for (const [station, key] of [[60003760, "jita"], [60008494, "amarr"]]) {
+          for (let i = 0; i < ids.length; i += 100) {
+            const chunk = ids.slice(i, i + 100);
+            const agg = await fetch(`https://market.fuzzwork.co.uk/aggregates/?station=${station}&types=${chunk.join(",")}`).then((r) => r.json());
+            for (const [tid, v] of Object.entries(agg)) {
+              const nm = idOf.get(Number(tid));
+              if (!nm) continue;
+              const min = Number(v?.sell?.min);
+              if (!out.has(nm)) out.set(nm, {});
+              if (min > 0) out.get(nm)[key] = min;
+            }
+          }
+        }
+      } catch (e) { /* leave unresolved */ }
+      return out;
+    }
+
+    let lastTotals = null;
+
+    async function appraise() {
+      const agg = parsePaste($("paste").value);
+      if (!agg.size) { $("status").innerHTML = '<span class="err">Nothing to parse — paste the contract contents first.</span>'; return; }
+      $("status").textContent = "APPRAISING…";
+      const missing = [...agg.keys()].filter((n) => !byName.has(n.toLowerCase()));
+      const extra = await resolveMissing(missing);
+      for (const [n, p] of extra) byName.set(n.toLowerCase(), p);
+
+      let jt = 0, at = 0, unknown = 0;
+      const rows = [];
+      for (const [name, qty] of agg) {
+        const p = byName.get(name.toLowerCase());
+        const j = p?.jita ?? null, a = p?.amarr ?? null;
+        if (j == null && a == null) unknown++;
+        jt += (j || 0) * qty; at += (a || 0) * qty;
+        rows.push(`<tr class="${j == null && a == null ? "unknown" : ""}">
+          <td class="left">${esc(name)}${j == null && a == null ? ' <span class="galtag">?</span>' : ""}</td>
+          <td class="num">${qty.toLocaleString("en-US")}</td>
+          <td class="num">${isk(j)}</td><td class="num">${isk(j != null ? j * qty : null)}</td>
+          <td class="num">${isk(a)}</td><td class="num">${isk(a != null ? a * qty : null)}</td>
+        </tr>`);
+      }
+      rows.push(`<tr class="totalrow"><td class="left">TOTAL (${agg.size} types)</td><td></td><td></td><td class="num">${isk(jt)}</td><td></td><td class="num">${isk(at)}</td></tr>`);
+      $("body").innerHTML = rows.join("");
+      $("results").classList.remove("hidden");
+      $("status").textContent = unknown ? `${unknown} line${unknown > 1 ? "s" : ""} could not be priced (amber).` : "";
+      lastTotals = { jt, at };
+      judge();
+    }
+
+    function judge() {
+      const ask = parseAmt($("asking").value);
+      const vb = $("verdict-box");
+      if (!lastTotals || ask == null || !lastTotals.jt) { vb.innerHTML = ""; return; }
+      const pct = Math.round((ask / lastTotals.jt - 1) * 100);
+      const v = verdictFor(pct);
+      vb.innerHTML = `<span class="${v.cls}">${v.label}</span> <span class="dim">— asking ${isk(ask)} vs ${isk(lastTotals.jt)} Jita value (${pct >= 0 ? "+" : ""}${pct}%)${lastTotals.at ? ` · ${Math.round((ask / lastTotals.at - 1) * 100) >= 0 ? "+" : ""}${Math.round((ask / lastTotals.at - 1) * 100)}% vs Amarr` : ""}</span>`;
+    }
+
+    $("go").addEventListener("click", appraise);
+    $("asking").addEventListener("input", judge);
+    $("paste").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) appraise(); });
+  })();
+  </script>
+</body>
+</html>
