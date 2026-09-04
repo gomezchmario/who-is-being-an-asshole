@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XHQ WAR ROOM</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    details.doctrine { border: 1px solid var(--border); background: var(--panel); margin-bottom: 10px; }
+    details.doctrine > summary {
+      cursor: pointer; list-style: none; padding: 10px 14px;
+      font-family: "VT323", monospace; font-size: 22px; letter-spacing: 0.04em;
+      display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    }
+    details.doctrine > summary::before { content: "▸ "; color: var(--amber); }
+    details.doctrine[open] > summary::before { content: "▾ "; }
+    details.doctrine > summary:hover { background: rgba(51, 255, 102, 0.06); }
+    summary .dstats { font-family: "Share Tech Mono", monospace; font-size: 13px; color: var(--phosphor-dim); align-self: center; }
+    .fitblock { border-top: 1px dashed var(--phosphor-faint); padding: 10px 14px; }
+    .fitname { color: var(--phosphor); font-size: 15px; }
+    .fitline { font-size: 13px; color: var(--phosphor-dim); margin: 3px 0; }
+    .fitline b { color: var(--phosphor); }
+    .missline { color: var(--red); font-size: 13px; }
+    .costs span { margin-right: 16px; white-space: nowrap; }
+    details.items { margin-top: 6px; }
+    details.items > summary { cursor: pointer; font-size: 12px; color: var(--phosphor-faint); list-style: none; }
+    details.items > summary::before { content: "▸ "; }
+    details.items[open] > summary::before { content: "▾ "; }
+    details.items table { min-width: 0; width: 100%; font-size: 13px; margin-top: 4px; }
+    .misspanel { margin-bottom: 14px; }
+    .misspanel h2 { font-family: "VT323", monospace; font-size: 22px; margin: 0 0 6px; color: var(--amber); }
+    .misspanel ul { margin: 0; padding-left: 18px; columns: 2; font-size: 14px; }
+    .misspanel li { color: var(--red); margin-bottom: 2px; }
+    .misspanel li .dim { color: var(--phosphor-faint); }
+    .ok-inline { color: var(--phosphor); }
+    @media (max-width: 640px) { .misspanel ul { columns: 1; } }
+  </style>
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <div class="crt" aria-hidden="true"></div>
+
+  <main class="terminal">
+    <header>
+      <div class="topline">
+        <span>CVA LOGISTICS COMMAND // EYES ONLY</span>
+        <span id="clock">--:--:--</span>
+      </div>
+      <h1 class="title">XHQ <span class="red glitch">WAR ROOM</span></h1>
+      <p class="subtitle">▸ DOCTRINE READINESS BOARD ◂</p>
+      <p class="tagline">can we actually buy our doctrines at home? · unlisted page — share the link only with people you trust</p>
+    </header>
+
+    <section class="panel">
+      <div class="row spread wrap">
+        <span id="scan-info" class="dim">ESTABLISHING UPLINK<span class="blink">…</span></span>
+      </div>
+    </section>
+
+    <section id="status" class="log"></section>
+
+    <section id="missing-wrap" class="hidden">
+      <div class="panel misspanel">
+        <h2>DOCTRINE AMMO / DRONES NOT SOLD IN XHQ</h2>
+        <ul id="missing-ammo"></ul>
+      </div>
+      <div class="panel misspanel">
+        <h2>DOCTRINE IMPLANTS NOT SOLD IN XHQ</h2>
+        <ul id="missing-implants"></ul>
+      </div>
+    </section>
+
+    <section id="doctrines"></section>
+
+    <footer>
+      <p class="dim small">unlisted · data: EVE ESI + Janice (Jita 4-4 &amp; Amarr min sell) · XHQ = Immortalis Fortizar market/contracts · auto-updates every ~30 min</p>
+    </footer>
+  </main>
+
+  <script>
+  (() => {
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    const PINNED = [/nightmare|lunatach/i, /tempest/i, /drake/i];
+
+    function tickClock() { $("clock").textContent = new Date().toISOString().slice(11, 19) + " EVE"; }
+    setInterval(tickClock, 1000); tickClock();
+
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    function isk(n) {
+      if (n == null) return "—";
+      if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+      if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+      return Math.round(n).toLocaleString("en-US");
+    }
+    function age(iso) {
+      const m = Math.round((Date.now() - new Date(iso)) / 60000);
+      return m < 60 ? m + " min ago" : Math.floor(m / 60) + "h " + (m % 60) + "m ago";
+    }
+
+    function fitBlock(f) {
+      const hullMkt = f.hullMkt ? `<b>${f.hullMkt.q}</b> on market @ ${isk(f.hullMkt.min)}` : `<span class="missline">none on market</span>`;
+      const hullCon = f.hullCon ? `<b>${f.hullCon.n}</b> contracts from ${isk(f.hullCon.min)}` : `<span class="missline">no contracts</span>`;
+      const miss = f.missing.length
+        ? `<div class="missline">MISSING FROM XHQ MARKET: ${f.missing.map((m) => esc(m.name) + (m.qty > 1 ? " ×" + m.qty : "")).join(", ")}</div>`
+        : `<div class="fitline ok-inline">✓ full fit available on XHQ market</div>`;
+      const rows = f.items.map((it) => `
+        <tr>
+          <td class="left">${esc(it.name)}</td>
+          <td class="num">${it.qty}</td>
+          <td class="num">${it.mkt ? isk(it.mkt.min) + " (" + it.mkt.q + ")" : '<span class="missline">—</span>'}</td>
+          <td class="num">${isk(it.jita)}</td>
+          <td class="num">${isk(it.amarr)}</td>
+        </tr>`).join("");
+      return `
+        <div class="fitblock">
+          <div class="fitname">${esc(f.t || f.hullName || "fit")}</div>
+          <div class="fitline">HULL ${esc(f.hullName || "?")}: ${hullMkt} · ${hullCon}</div>
+          <div class="fitline costs">
+            <span>XHQ: <b>${isk(f.costXhq)}</b>${f.xhqPartial ? " ± (missing items excluded)" : ""}</span>
+            <span>JITA: <b>${isk(f.costJita)}</b>${f.jitaPartial ? " ±" : ""}</span>
+            <span>AMARR: <b>${isk(f.costAmarr)}</b>${f.amarrPartial ? " ±" : ""}</span>
+            ${!f.xhqPartial && f.costJita ? `<span class="dim">(XHQ is ${Math.round((f.costXhq / f.costJita - 1) * 100)}% vs Jita)</span>` : ""}
+          </div>
+          ${miss}
+          <details class="items"><summary>item breakdown</summary>
+            <div class="tablewrap"><table>
+              <thead><tr><th class="left">ITEM</th><th class="num">QTY</th><th class="num">XHQ (avail)</th><th class="num">JITA</th><th class="num">AMARR</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table></div>
+          </details>
+        </div>`;
+    }
+
+    function render(data) {
+      $("scan-info").innerHTML = `LAST SCAN: <b>${age(data.generated)}</b> · SYSTEM: <b>${esc(data.system)}</b> · ${data.doctrines.length} doctrines`;
+
+      const fillMissing = (elId, list) => {
+        $(elId).innerHTML = list.length
+          ? list.map((m) => `<li>${esc(m.name)} <span class="dim">(${m.fits} fit${m.fits > 1 ? "s" : ""})</span></li>`).join("")
+          : '<li class="ok-inline">nothing missing — miracle confirmed</li>';
+      };
+      fillMissing("missing-ammo", data.missingAmmo || []);
+      fillMissing("missing-implants", data.missingImplants || []);
+      $("missing-wrap").classList.remove("hidden");
+
+      const ds = data.doctrines.slice();
+      const pinned = [];
+      for (const re of PINNED) {
+        const idx = ds.findIndex((d) => re.test(d.name));
+        if (idx >= 0) pinned.push(ds.splice(idx, 1)[0]);
+      }
+      const ordered = [...pinned, ...ds];
+
+      $("doctrines").innerHTML = ordered.map((d, i) => {
+        const totalMissing = d.fits.reduce((s, f) => s + f.missing.length, 0);
+        const stats = `${d.fits.length} fits · ` + (totalMissing
+          ? `<span style="color:var(--red)">${totalMissing} items unavailable</span>`
+          : `<span class="ok-inline">all buyable in XHQ</span>`);
+        return `<details class="doctrine"${i < 3 ? " open" : ""}>
+          <summary>${esc(d.name)} <span class="dstats">${stats}</span></summary>
+          ${d.fits.map(fitBlock).join("")}
+        </details>`;
+      }).join("");
+    }
+
+    fetch("readiness.json", { cache: "no-cache" })
+      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(render)
+      .catch((e) => {
+        $("status").innerHTML = `<span class="err">NO READINESS DATA YET (${esc(e.message)}). Run the update workflow after committing doctrines.json.</span>`;
+        $("scan-info").textContent = "AWAITING FIRST SCAN";
+      });
+  })();
+  </script>
+</body>
+</html>

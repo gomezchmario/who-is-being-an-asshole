@@ -142,10 +142,17 @@ async function main() {
   writeFileSync(itemsCacheFile, JSON.stringify({ _v: 2, ...itemsCache }));
   console.log(`Contracts at structures: ${contractsRaw.length} (${newContracts.length} newly fetched).`);
 
+  // 2c. Structured doctrine data (scraped snapshot) for the readiness page.
+  let doctrineData = null;
+  try { doctrineData = JSON.parse(readFileSync(new URL("../doctrines.json", import.meta.url), "utf8")); } catch {}
+  const doctrineTypeIds = doctrineData
+    ? [...new Set(Object.values(doctrineData.fits).flatMap((f) => f.i.map((x) => x[0])))]
+    : [];
+
   // 3. Jita reference prices from Janice (min sell at Jita 4-4, falling
   //    back to the 5-day median sell when Jita is momentarily out of stock).
   const contractTypeIds = Object.values(itemsCache).flatMap((items) => items.map((i) => i[0]));
-  const typeIds = [...new Set([...sells.map((o) => o.type_id), ...contractTypeIds])];
+  const typeIds = [...new Set([...sells.map((o) => o.type_id), ...contractTypeIds, ...doctrineTypeIds])];
   const jita = {};
   for (let i = 0; i < typeIds.length; i += 500) {
     const chunk = typeIds.slice(i, i + 500);
@@ -159,6 +166,23 @@ async function main() {
       const p = item?.immediatePrices;
       const price = Number(p?.sellPrice) || Number(p?.sellPrice5DayMedian);
       if (item?.itemType?.eid && price > 0) jita[item.itemType.eid] = price;
+    }
+  }
+
+  // 3a. Amarr prices (Janice market 115) — only needed for doctrine items.
+  const amarr = {};
+  for (let i = 0; i < doctrineTypeIds.length; i += 500) {
+    const chunk = doctrineTypeIds.slice(i, i + 500);
+    const res = await fetch(`https://janice.e-351.com/api/rest/v2/pricer?market=115`, {
+      method: "POST",
+      headers: { "X-ApiKey": JANICE_API_KEY, "Content-Type": "text/plain", "User-Agent": UA },
+      body: chunk.join("\n"),
+    });
+    if (!res.ok) { console.warn(`Janice Amarr HTTP ${res.status}, skipping Amarr prices.`); break; }
+    for (const item of await res.json()) {
+      const p = item?.immediatePrices;
+      const price = Number(p?.sellPrice) || Number(p?.sellPrice5DayMedian);
+      if (item?.itemType?.eid && price > 0) amarr[item.itemType.eid] = price;
     }
   }
 
@@ -364,6 +388,74 @@ async function main() {
   const cOff = contracts.filter((x) => x.markup >= 0.3).length;
   console.log(`Wrote contracts.json: ${contracts.length} contracts, ${cOff} assholes, ` +
     `${contracts.filter((x) => x.doctrine).length} doctrine-ship, ${contracts.filter((x) => x.scalp).length} scalps.`);
+
+  // 7. Doctrine readiness (for the unlinked war-room page): per fit, can it be
+  //    bought in XHQ, at what cost, vs Jita and Amarr; what's missing locally.
+  if (doctrineData) {
+    const xhqMkt = {};
+    for (const o of sells) {
+      const m = (xhqMkt[o.type_id] ??= { q: 0, min: Infinity });
+      m.q += o.volume_remain;
+      if (o.price < m.min) m.min = o.price;
+    }
+    const hullCon = {}; // hull type_id -> {n, min contract price}
+    for (const c of contractsRaw) {
+      const items = itemsCache[c.contract_id] || [];
+      const hulls = new Set(items.filter((i) => i[2] && catCache[i[0]]?.[1] === 6).map((i) => i[0]));
+      for (const h of hulls) {
+        const e = (hullCon[h] ??= { n: 0, min: Infinity });
+        e.n++;
+        if (c.price < e.min) e.min = c.price;
+      }
+    }
+    const doctrines = doctrineData.doctrines.map((d) => ({
+      name: d.name,
+      fits: d.fits.filter((fid) => doctrineData.fits[fid]).map((fid) => {
+        const f = doctrineData.fits[fid];
+        const items = f.i.map(([tid, qty]) => {
+          const m = xhqMkt[tid];
+          return {
+            id: tid, name: names[tid] || `type ${tid}`, qty,
+            cat: catCache[tid]?.[1] ?? null,
+            mkt: m ? { q: m.q, min: m.min } : null,
+            jita: jita[tid] ?? galaxy[tid] ?? null,
+            amarr: amarr[tid] ?? null,
+          };
+        });
+        const missing = items.filter((it) => !it.mkt);
+        let costXhq = 0, xhqPartial = false, costJita = 0, jitaPartial = false, costAmarr = 0, amarrPartial = false;
+        for (const it of items) {
+          if (it.mkt) costXhq += it.mkt.min * it.qty; else xhqPartial = true;
+          if (it.jita != null) costJita += it.jita * it.qty; else jitaPartial = true;
+          if (it.amarr != null) costAmarr += it.amarr * it.qty; else amarrPartial = true;
+        }
+        return {
+          t: f.t, hull: f.h, hullName: names[f.h] || null,
+          hullMkt: xhqMkt[f.h] ? { q: xhqMkt[f.h].q, min: xhqMkt[f.h].min } : null,
+          hullCon: hullCon[f.h] || null,
+          items, missing: missing.map((it) => ({ id: it.id, name: it.name, qty: it.qty, cat: it.cat })),
+          costXhq, xhqPartial, costJita, jitaPartial, costAmarr, amarrPartial,
+        };
+      }),
+    }));
+    // Doctrine consumables/implants absent from the XHQ market entirely.
+    const usedTypes = new Map();
+    for (const f of Object.values(doctrineData.fits)) {
+      for (const [tid] of f.i) usedTypes.set(tid, (usedTypes.get(tid) || 0) + 1);
+    }
+    const missingBy = (cats) => [...usedTypes.keys()]
+      .filter((tid) => cats.includes(catCache[tid]?.[1]) && !xhqMkt[tid])
+      .map((tid) => ({ id: tid, name: names[tid] || `type ${tid}`, fits: usedTypes.get(tid) }))
+      .sort((a, b) => b.fits - a.fits);
+    writeFileSync(new URL("../readiness.json", import.meta.url), JSON.stringify({
+      generated: new Date().toISOString(),
+      system: "XHQ-7V",
+      doctrines,
+      missingAmmo: missingBy([8, 18, 87]),
+      missingImplants: missingBy([20]),
+    }));
+    console.log(`Wrote readiness.json: ${doctrines.length} doctrines.`);
+  }
 }
 
 main().catch((e) => {

@@ -34,7 +34,7 @@ jobs:
         run: |
           git config user.name "concord-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add data.json type-cats.json contracts.json contract-items.json contracts-history.json scalp-log.json
+          git add data.json type-cats.json contracts.json contract-items.json contracts-history.json scalp-log.json readiness.json
           git diff --cached --quiet && echo "No market changes." && exit 0
           git commit -m "market scan $(date -u +'%Y-%m-%d %H:%M') UTC"
           git push

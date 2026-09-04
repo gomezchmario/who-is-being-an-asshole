@@ -10,9 +10,10 @@
 
   const VERDICTS = [
     { min: -Infinity, label: "░ HONEST", cls: "v0", tier: 0 },
-    { min: 0.20,      label: "▒ CHEEKY", cls: "v1", tier: 1 },
-    { min: 0.50,      label: "▓ ASSHOLE", cls: "v2", tier: 2 },
-    { min: 1.00,      label: "█ GALACTIC ASSHOLE", cls: "v3", tier: 3 },
+    { min: 0.30,      label: "▒ CHEEKY", cls: "v1", tier: 1 },
+    { min: 0.50,      label: "▓ DICK", cls: "v2", tier: 2 },
+    { min: 1.00,      label: "█ ASSHOLE", cls: "v3", tier: 3 },
+    { min: 2.00,      label: "█ GALACTIC ASSHOLE", cls: "v4", tier: 4 },
   ];
 
   let data = null;
@@ -85,7 +86,8 @@
     if (!data) return;
     const threshold = Math.max(0, Number($("threshold").value) || 30) / 100;
     const showAll = $("show-all").checked;
-    $("threshold-label").textContent = Math.round(threshold * 100);
+    const tl = $("threshold-label");
+    if (tl) tl.textContent = Math.round(threshold * 100);
 
     const structNames = data.structures || {};
     const rows = [];
@@ -139,8 +141,7 @@
     if (offenders === 0) {
       summary.innerHTML = `<span class="ok">NOBODY IS BEING AN ASSHOLE.</span> <span class="dim">(${judged} orders judged — a miracle in New Eden)</span>`;
     } else {
-      summary.innerHTML = `<span class="count">${offenders}</span> OF ${judged} SELL ORDERS ARE BEING ASSHOLES` +
-        ` <span class="dim">(&ge;${Math.round(threshold * 100)}% over Jita)</span>`;
+      summary.innerHTML = `<span class="count">${offenders}</span> OF ${judged} SELL ORDERS ARE (&ge;${Math.round(threshold * 100)}%) OVER JITA`;
     }
 
     $("scan-info").innerHTML =

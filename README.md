@@ -61,8 +61,9 @@ EVE_CLIENT_ID=... EVE_CLIENT_SECRET=... EVE_REFRESH_TOKEN=... JANICE_API_KEY=...
 |---|---|
 | below threshold (default 30%) | ░ HONEST |
 | ≥ threshold | ▒ CHEEKY |
-| ≥ 50% | ▓ ASSHOLE |
-| ≥ 100% | █ GALACTIC ASSHOLE |
+| ≥ 50% | ▓ DICK |
+| ≥ 100% | █ ASSHOLE |
+| ≥ 200% | █ GALACTIC ASSHOLE |
 
 Notes: ESI keeps market orders anonymous, so the app shames orders, not pilots.
 Items with no Jita sell orders are skipped. Not affiliated with CCP Games.
