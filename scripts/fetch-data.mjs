@@ -587,11 +587,12 @@ async function main() {
     // alongside ammo, not modules; implants only come off a killmail when
     // the pod itself was destroyed.
     const ITEM_LOSS_CATS = new Set([7, 8, 18, 20, 32]);
-    // v1 cache entries were plain [shipTypeId, dateStr] tuples with no item
-    // breakdown. Bumping this discards any cache below it once, forcing a
-    // full re-fetch so every killmail in the window gets real item data
-    // instead of being skipped as "already known" with an empty list.
-    const ZK_CACHE_VERSION = 2;
+    // Bump this to discard the cache once and force a full re-fetch: the
+    // page loop below stops paginating the moment it sees any already-known
+    // killmail, so it can never naturally backfill further back in time —
+    // only a clean re-fetch reaches deeper pages. v1->v2 backfilled item
+    // breakdowns; v2->v3 backfills the 30->45 day window widening.
+    const ZK_CACHE_VERSION = 3;
     const zkFile = new URL("../zkill-cache.json", import.meta.url);
     let zk = {};
     try {
@@ -601,8 +602,13 @@ async function main() {
     const LOSS_WINDOW_DAYS = 45;
     const cutoff = Date.now() - LOSS_WINDOW_DAYS * 86400e3;
     const hardCutoff = Date.now() - (LOSS_WINDOW_DAYS + 5) * 86400e3;
+    // How many pages (200 killmails each) it takes to reach hardCutoff
+    // varies a lot by alliance activity — CVAA alone needs ~25 pages to
+    // reach 50 days back, so this needs real headroom, not just enough
+    // for the old 35-day window.
+    const MAX_PAGES = 40;
     for (const aid of Object.keys(ALLIANCES)) {
-      pages: for (let p = 1; p <= 8; p++) {
+      pages: for (let p = 1; p <= MAX_PAGES; p++) {
         let page;
         try {
           const res = await fetch(`https://zkillboard.com/api/losses/allianceID/${aid}/page/${p}/`, {
