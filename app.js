@@ -175,7 +175,7 @@
         </td>
         <td class="num">${o.volume.toLocaleString("en-US")}</td>
         <td class="num">${fmtIsk(o.price)}</td>
-        <td class="num">${fmtIsk(o.jita)}${o.gal ? ' <span class="galtag" title="No Jita sell orders — judged against the galaxy-wide average price">AVG</span>' : ""}</td>
+        <td class="num">${fmtIsk(o.jita)}${o.gal ? ' <span class="galtag" title="Judged against the galaxy-wide average price (capital/fighter gear, or nothing sold in Jita)">AVG</span>' : ""}</td>
         <td class="num markup">${o.markup >= 0 ? "+" : ""}${Math.round(o.markup * 100)}%</td>`;
       rows.push(tr);
     }

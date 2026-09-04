@@ -307,9 +307,12 @@ async function main() {
   const orders = sells.map((o) => {
     const [grp, cat] = catCache[o.type_id] ?? [null, null];
     const name = names[o.type_id] || null;
-    const gal = jita[o.type_id] == null && galaxy[o.type_id] != null;
-    const ref = jita[o.type_id] ?? galaxy[o.type_id] ?? null;
     const capital = CAP_GROUPS.has(grp) || (name != null && CAP_NAME_RE.test(name)) || cat === 87;
+    // Capital gear and fighters are always judged against the galaxy-wide
+    // average — Jita isn't the market these actually trade in.
+    const useAvg = capital && galaxy[o.type_id] != null;
+    const gal = useAvg || (jita[o.type_id] == null && galaxy[o.type_id] != null);
+    const ref = useAvg ? galaxy[o.type_id] : (jita[o.type_id] ?? galaxy[o.type_id] ?? null);
     return {
       type_id: o.type_id,
       name,
