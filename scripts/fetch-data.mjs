@@ -11,6 +11,11 @@ const SYSTEM_ID = 30003731; // XHQ-7V
 const REGION_ID = 10000047; // Providence
 const JANICE_MARKET = 2; // Jita 4-4
 const KNOWN_STRUCTURES = [1035949018593];
+// Capital ship groups: Titan, Dread, Carrier, Super, FAX, Rorqual, Freighter,
+// Jump Freighter, Lancer Dread.
+const CAP_GROUPS = new Set([30, 485, 547, 659, 1538, 883, 513, 902, 4594]);
+// Capital-only gear that lacks "Capital"/"XL" in its name.
+const CAP_NAME_RE = /Capital |(^|\s)XL(\s|$)|^(Siege|Triage) Module|^Fighter Support Unit|^Networked Sensor Array/;
 // Name lookup via /universe/structures/ needs an extra scope
 // (esi-universe.read_structures.v1) the token may not have; fall back here.
 const KNOWN_NAMES = { 1035949018593: "XHQ-7V - Immortalis Fortizar" };
@@ -125,11 +130,15 @@ async function main() {
     }
   }
 
-  // 3b. Item categories (for the frontend filters), via ESI type -> group ->
-  //     category. Cached in type-cats.json so each run only looks up new types.
+  // 3b. Item group + category (for the frontend filters), via ESI type ->
+  //     group -> category. Cached in type-cats.json ({tid: [group, category]})
+  //     so each run only looks up new types.
   const catCacheFile = new URL("../type-cats.json", import.meta.url);
   let catCache = {};
-  try { catCache = JSON.parse(readFileSync(catCacheFile, "utf8")); } catch {}
+  try {
+    const raw = JSON.parse(readFileSync(catCacheFile, "utf8"));
+    for (const [k, v] of Object.entries(raw)) if (Array.isArray(v)) catCache[k] = v;
+  } catch {}
   const unknownTypes = typeIds.filter((t) => catCache[t] == null);
   const typeGroups = {};
   await inBatches(unknownTypes, 20, async (tid) => {
@@ -142,10 +151,21 @@ async function main() {
     if (!res.error) groupCats[gid] = res.json.category_id;
   });
   for (const [tid, gid] of Object.entries(typeGroups)) {
-    if (groupCats[gid] != null) catCache[tid] = groupCats[gid];
+    if (groupCats[gid] != null) catCache[tid] = [gid, groupCats[gid]];
   }
   writeFileSync(catCacheFile, JSON.stringify(catCache));
   console.log(`Categorized ${unknownTypes.length} new types (cache now ${Object.keys(catCache).length}).`);
+
+  // 3c. Galaxy-wide average prices (CCP's in-game estimate) as reference for
+  //     anything Jita has no sell orders for — capital hulls, mostly.
+  const galaxy = {};
+  {
+    const res = await esiJson(`${ESI}/markets/prices/`);
+    for (const p of res.json || []) {
+      const v = Number(p.average_price) || Number(p.adjusted_price);
+      if (v > 0) galaxy[p.type_id] = v;
+    }
+  }
 
   // 4. Type names.
   const names = {};
@@ -159,18 +179,25 @@ async function main() {
     for (const n of res.json || []) names[n.id] = n.name;
   }
 
-  // 5. Assemble output.
+  // 5. Assemble output. Reference price is Jita min sell; galaxy average
+  //    fallback (marked gal:1) when Jita has none.
   const orders = sells.map((o) => {
-    const j = jita[o.type_id] ?? null;
+    const [grp, cat] = catCache[o.type_id] ?? [null, null];
+    const name = names[o.type_id] || null;
+    const gal = jita[o.type_id] == null && galaxy[o.type_id] != null;
+    const ref = jita[o.type_id] ?? galaxy[o.type_id] ?? null;
+    const capital = CAP_GROUPS.has(grp) || (name != null && CAP_NAME_RE.test(name)) || cat === 87;
     return {
       type_id: o.type_id,
-      name: names[o.type_id] || null,
+      name,
       price: o.price,
-      jita: j,
-      markup: j ? o.price / j - 1 : null,
+      jita: ref,
+      markup: ref ? o.price / ref - 1 : null,
       volume: o.volume_remain,
       location_id: String(o.location_id),
-      cat: catCache[o.type_id] ?? null,
+      cat,
+      ...(gal && { gal: 1 }),
+      ...(capital && { capital: 1 }),
     };
   });
   orders.sort((a, b) => (b.markup ?? -Infinity) - (a.markup ?? -Infinity));

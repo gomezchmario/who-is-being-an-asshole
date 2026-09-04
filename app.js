@@ -25,12 +25,16 @@
     modules: new Set([7, 32]), // modules, rigs, subsystems
     fit: new Set([6, 7, 8, 18, 32, 87]), // union: "everything else" is the complement
   };
-  const MIN_VALUE = 1_000_000;
+  const MIN_VALUE = 1_000_000; // per unit
   const filters = { min: true, cat: "all" };
+  let doctrineTypes = new Set();
+  const sort = { key: "markup", dir: -1 };
 
   function passesFilters(o) {
-    if (filters.min && o.price * o.volume < MIN_VALUE) return false;
+    if (filters.min && o.price < MIN_VALUE) return false;
     if (filters.cat === "all") return true;
+    if (filters.cat === "doctrine") return doctrineTypes.has(o.type_id);
+    if (filters.cat === "caps") return !!o.capital;
     if (o.cat == null) return filters.cat === "nonfit";
     if (filters.cat === "nonfit") return !CATS.fit.has(o.cat);
     return CATS[filters.cat].has(o.cat);
@@ -81,7 +85,18 @@
     let judged = 0;
 
     const orders = (data.orders || []).slice();
-    orders.sort((a, b) => (b.markup ?? -Infinity) - (a.markup ?? -Infinity));
+    orders.sort((a, b) => {
+      let va = a[sort.key], vb = b[sort.key];
+      if (sort.key === "name") {
+        va = va || ""; vb = vb || "";
+        return sort.dir * va.localeCompare(vb);
+      }
+      return sort.dir * ((va ?? -Infinity) - (vb ?? -Infinity));
+    });
+    for (const th of document.querySelectorAll("th.sortable")) {
+      th.querySelector(".arrow").textContent =
+        th.dataset.key === sort.key ? (sort.dir === 1 ? " ▲" : " ▼") : " ·";
+    }
 
     let noJita = 0;
     for (const o of orders) {
@@ -104,7 +119,7 @@
         </td>
         <td class="num">${o.volume.toLocaleString("en-US")}</td>
         <td class="num">${fmtIsk(o.price)}</td>
-        <td class="num">${fmtIsk(o.jita)}</td>
+        <td class="num">${fmtIsk(o.jita)}${o.gal ? ' <span class="galtag" title="No Jita sell orders — judged against the galaxy-wide average price">AVG</span>' : ""}</td>
         <td class="num markup">+${Math.round(o.markup * 100)}%</td>`;
       rows.push(tr);
     }
@@ -138,6 +153,10 @@
   }
 
   async function load() {
+    fetch("doctrine-items.json", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.types) { doctrineTypes = new Set(d.types); render(); } })
+      .catch(() => {});
     const mock = new URLSearchParams(location.search).has("mock");
     if (mock) {
       data = mockData();
@@ -169,7 +188,9 @@
       system: "XHQ-7V",
       structures: { "1035949018593": "XHQ-7V - Immortalis Fortizar" },
       orders: [
-        { type_id: 44992, name: "Ishtar", price: 412000000, jita: 318000000, volume: 3, location_id: "1035949018593", markup: 0.2956, cat: 6 },
+        { type_id: 12005, name: "Ishtar", price: 412000000, jita: 318000000, volume: 3, location_id: "1035949018593", markup: 0.2956, cat: 6 },
+        { type_id: 19722, name: "Naglfar", price: 5900000000, jita: 3480000000, volume: 2, location_id: "1035949018593", markup: 0.6954, cat: 6, capital: 1, gal: 1 },
+        { type_id: 41443, name: "Capital Ancillary Shield Booster", price: 99000000, jita: 62000000, volume: 4, location_id: "1035949018593", markup: 0.5968, cat: 7, capital: 1 },
         { type_id: 2048,  name: "Damage Control II", price: 2100000, jita: 690000, volume: 14, location_id: "1035949018593", markup: 2.0435, cat: 7 },
         { type_id: 12058, name: "Nanite Repair Paste", price: 38000, jita: 30500, volume: 5000, location_id: "1035949018593", markup: 0.2459, cat: 8 },
         { type_id: 3841,  name: "Large Shield Extender II", price: 1310000, jita: 1240000, volume: 22, location_id: "1035949018593", markup: 0.0565, cat: 7 },
@@ -191,6 +212,14 @@
     btn.addEventListener("click", () => {
       filters.cat = btn.dataset.cat;
       for (const b of document.querySelectorAll(".cbtn")) b.classList.toggle("on", b === btn);
+      render();
+    });
+  }
+
+  for (const th of document.querySelectorAll("th.sortable")) {
+    th.addEventListener("click", () => {
+      if (sort.key === th.dataset.key) sort.dir = -sort.dir;
+      else { sort.key = th.dataset.key; sort.dir = th.dataset.key === "name" ? 1 : -1; }
       render();
     });
   }

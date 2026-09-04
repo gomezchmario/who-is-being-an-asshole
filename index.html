@@ -39,13 +39,15 @@
     <section class="panel filters">
       <div class="row wrap">
         <span class="dim">FILTERS:</span>
-        <button id="f-min" class="fbtn on" title="Hide orders whose total value (price × qty) is under 1,000,000 ISK">HIDE &lt; 1M ISK</button>
+        <button id="f-min" class="fbtn on" title="Hide orders priced under 1,000,000 ISK per unit">HIDE &lt; 1M ISK</button>
         <span class="sep">│</span>
         <button class="fbtn cbtn on" data-cat="all">ALL</button>
         <button class="fbtn cbtn" data-cat="ammo">AMMO+DRONES</button>
         <button class="fbtn cbtn" data-cat="ships">SHIPS</button>
-        <button class="fbtn cbtn" data-cat="modules">SHIP MODULES</button>
+        <button class="fbtn cbtn" data-cat="modules">MODULES</button>
+        <button class="fbtn cbtn" data-cat="caps" title="Capital hulls, capital modules, fighters — hulls are judged against the galaxy average price since Jita 4-4 sells no capitals">CAPITALS</button>
         <button class="fbtn cbtn" data-cat="nonfit">EVERYTHING ELSE</button>
+        <button class="fbtn cbtn doctrine" data-cat="doctrine" title="Items appearing in CVA doctrine fits">CVA DOCTRINE</button>
       </div>
     </section>
 
@@ -57,12 +59,12 @@
         <table id="results-table">
           <thead>
             <tr>
-              <th class="left">VERDICT</th>
-              <th class="left">ITEM</th>
-              <th class="num">QTY</th>
-              <th class="num">LOCAL PRICE</th>
-              <th class="num">JITA SELL</th>
-              <th class="num">MARKUP</th>
+              <th class="left sortable" data-key="markup">VERDICT<span class="arrow"></span></th>
+              <th class="left sortable" data-key="name">ITEM<span class="arrow"></span></th>
+              <th class="num sortable" data-key="volume">QTY<span class="arrow"></span></th>
+              <th class="num sortable" data-key="price">LOCAL PRICE<span class="arrow"></span></th>
+              <th class="num sortable" data-key="jita">JITA SELL<span class="arrow"></span></th>
+              <th class="num sortable" data-key="markup">MARKUP<span class="arrow"></span></th>
             </tr>
           </thead>
           <tbody id="results-body"></tbody>

@@ -186,6 +186,13 @@ input[type="checkbox"] { accent-color: var(--phosphor-dim); }
   font-weight: bold;
   box-shadow: 0 0 10px rgba(51, 255, 102, 0.35);
 }
+.fbtn.doctrine { border-color: var(--amber); color: var(--amber); }
+.fbtn.doctrine:hover { color: #ffd066; border-color: #ffd066; }
+.fbtn.doctrine.on {
+  background: var(--amber);
+  color: #1c1000;
+  box-shadow: 0 0 10px rgba(255, 176, 0, 0.45);
+}
 
 /* --- status log --- */
 .log {
@@ -227,6 +234,17 @@ thead th {
   font-weight: normal;
   text-align: right;
   border-bottom: 1px solid var(--border);
+}
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { background: var(--phosphor-dim); color: #02120a; }
+th.sortable .arrow { color: var(--amber); }
+
+.galtag {
+  color: var(--amber);
+  font-size: 11px;
+  border: 1px solid var(--amber);
+  padding: 0 3px;
+  letter-spacing: 0.06em;
 }
 th.left, td.left { text-align: left; }
 th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
