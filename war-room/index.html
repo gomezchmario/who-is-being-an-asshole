@@ -41,8 +41,15 @@
     details.items[open] > summary::before { content: "▾ "; }
     details.items table { min-width: 0; width: 100%; font-size: 13px; margin-top: 4px; }
     .misspanel { margin-bottom: 14px; }
-    .misspanel > summary { color: var(--amber); }
+    details.misspanel > summary { color: var(--amber); justify-content: flex-start; }
+    .stocked { padding: 0 14px 12px; }
+    .stocked > summary { cursor: pointer; font-size: 12px; color: var(--phosphor-dim); list-style: none; }
+    .stocked > summary::before { content: "▸ "; }
+    .stocked[open] > summary::before { content: "▾ "; }
+    .stocked table { min-width: 0; width: 100%; font-size: 13px; margin-top: 6px; }
+    .lowrow td { color: var(--amber); }
     .misspanel ul { margin: 0; padding: 0 14px 12px 14px; columns: 2; font-size: 14px; list-style-position: inside; text-align: left; }
+    .misshead { color: var(--phosphor-dim); padding: 6px 14px 4px; font-size: 13px; letter-spacing: 0.15em; }
     .misspanel li { color: var(--red); margin-bottom: 2px; }
     .misspanel li .dim { color: var(--phosphor-faint); }
     .ok-inline { color: var(--phosphor); }
@@ -76,10 +83,12 @@
       <details class="doctrine misspanel" open>
         <summary>DOCTRINE AMMO / DRONES NOT SOLD IN XHQ</summary>
         <ul id="missing-ammo"></ul>
+        <div id="stocked-ammo"></div>
       </details>
       <details class="doctrine misspanel" open>
         <summary>DOCTRINE IMPLANTS NOT SOLD IN XHQ</summary>
-        <ul id="missing-implants"></ul>
+        <div id="missing-implants"></div>
+        <div id="stocked-implants"></div>
       </details>
     </section>
 
@@ -261,11 +270,46 @@
       const hwRows = hardwirings.sort().map((n) => `<li>${esc(n)}</li>`);
       const drugRows = drugs.sort().map((n) => `<li>${esc(n)}</li>`);
       $("missing-implants").innerHTML = setRows.length + hwRows.length + drugRows.length
-        ? setRows.join("") +
-          (hwRows.length ? `<li class="dim" style="margin-top:6px">HARDWIRINGS:</li>` + hwRows.join("") : "") +
-          (drugRows.length ? `<li class="dim" style="margin-top:6px">DRUGS:</li>` + drugRows.join("") : "")
-        : '<li class="ok-inline">nothing missing — miracle confirmed</li>';
+        ? (setRows.length ? `<div class="misshead">SETS</div><ul>${setRows.join("")}</ul>` : "") +
+          (hwRows.length ? `<div class="misshead">HARDWIRINGS</div><ul>${hwRows.join("")}</ul>` : "") +
+          (drugRows.length ? `<div class="misshead">DRUGS</div><ul>${drugRows.join("")}</ul>` : "")
+        : '<ul><li class="ok-inline">nothing missing — miracle confirmed</li></ul>';
       $("missing-wrap").classList.remove("hidden");
+
+      // Doctrine consumables/implants we DO have on the XHQ market: stock,
+      // rough fit-loads remaining, and markup vs the hubs.
+      const agg = new Map();
+      for (const d of data.doctrines) for (const f of d.fits) for (const it of f.items) {
+        if (!it.mkt) continue;
+        const e = agg.get(it.id) || { name: it.name, cat: it.cat, q: it.mkt.q, min: it.mkt.min, jita: it.jita, amarr: it.amarr, maxQ: 0 };
+        e.maxQ = Math.max(e.maxQ, it.qty);
+        agg.set(it.id, e);
+      }
+      const stockedTable = (elId, items, isAmmo) => {
+        if (!items.length) { $(elId).innerHTML = ""; return; }
+        const rows = items.map((e) => {
+          const loads = Math.floor(e.q / e.maxQ);
+          const low = isAmmo ? loads < 10 : e.q < 5;
+          return `<tr class="${low ? "lowrow" : ""}">
+            <td class="left">${esc(e.name)}${low ? " ⚠" : ""}</td>
+            <td class="num">${e.q.toLocaleString("en-US")}</td>
+            ${isAmmo ? `<td class="num">${loads}</td>` : ""}
+            <td class="num">${isk(e.min)}</td>
+            <td class="num">${pctTag(e.jita ? e.min / e.jita - 1 : null) || "—"}</td>
+            <td class="num">${pctTag(e.amarr ? e.min / e.amarr - 1 : null) || "—"}</td>
+          </tr>`;
+        }).join("");
+        $(elId).innerHTML = `<details class="stocked">
+          <summary>view the ${items.length} type${items.length > 1 ? "s" : ""} we DO have — stock &amp; markup</summary>
+          <div class="tablewrap"><table>
+            <thead><tr><th class="left">ITEM</th><th class="num">STOCK</th>${isAmmo ? '<th class="num" title="Stock divided by the largest per-fit load">~FIT LOADS</th>' : ""}<th class="num">XHQ MIN</th><th class="num">vs JITA</th><th class="num">vs AMARR</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>
+        </details>`;
+      };
+      const byLoads = (a, b) => Math.floor(a.q / a.maxQ) - Math.floor(b.q / b.maxQ);
+      stockedTable("stocked-ammo", [...agg.values()].filter((e) => [8, 18, 87].includes(e.cat)).sort(byLoads), true);
+      stockedTable("stocked-implants", [...agg.values()].filter((e) => e.cat === 20).sort((a, b) => a.q - b.q), false);
 
       const ds = data.doctrines.slice();
       const pinned = [];
