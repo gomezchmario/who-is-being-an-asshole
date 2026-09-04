@@ -33,8 +33,8 @@
     details.items[open] > summary::before { content: "▾ "; }
     details.items table { min-width: 0; width: 100%; font-size: 13px; margin-top: 4px; }
     .misspanel { margin-bottom: 14px; }
-    .misspanel h2 { font-family: "VT323", monospace; font-size: 22px; margin: 0 0 6px; color: var(--amber); }
-    .misspanel ul { margin: 0; padding-left: 18px; columns: 2; font-size: 14px; }
+    .misspanel > summary { color: var(--amber); }
+    .misspanel ul { margin: 0; padding: 0 14px 12px 32px; columns: 2; font-size: 14px; }
     .misspanel li { color: var(--red); margin-bottom: 2px; }
     .misspanel li .dim { color: var(--phosphor-faint); }
     .ok-inline { color: var(--phosphor); }
@@ -65,14 +65,14 @@
     <section id="status" class="log"></section>
 
     <section id="missing-wrap" class="hidden">
-      <div class="panel misspanel">
-        <h2>DOCTRINE AMMO / DRONES NOT SOLD IN XHQ</h2>
+      <details class="doctrine misspanel" open>
+        <summary>DOCTRINE AMMO / DRONES NOT SOLD IN XHQ</summary>
         <ul id="missing-ammo"></ul>
-      </div>
-      <div class="panel misspanel">
-        <h2>DOCTRINE IMPLANTS NOT SOLD IN XHQ</h2>
+      </details>
+      <details class="doctrine misspanel" open>
+        <summary>DOCTRINE IMPLANTS NOT SOLD IN XHQ</summary>
         <ul id="missing-implants"></ul>
-      </div>
+      </details>
     </section>
 
     <section id="doctrines"></section>
@@ -125,9 +125,22 @@
         </details>`;
     }
 
+    function pctTag(pct) {
+      if (pct == null) return "";
+      const p = Math.round(pct * 100);
+      return ` <b style="color:${p > 0 ? "var(--red)" : "var(--phosphor)"}">(${p >= 0 ? "+" : ""}${p}%)</b>`;
+    }
+
     function fitBlock(f) {
-      const hullMkt = f.hullMkt ? `<b>${f.hullMkt.q}</b> on market @ ${isk(f.hullMkt.min)}` : `<span class="missline">none on market</span>`;
-      const hullCon = f.hullCon ? `<b>${f.hullCon.n}</b> contracts from ${isk(f.hullCon.min)}` : `<span class="missline">no contracts</span>`;
+      const hullItem = f.items.find((it) => it.id === f.hull);
+      const hullJita = hullItem?.jita ?? null;
+      const hullMkt = f.hullMkt
+        ? `<b>${f.hullMkt.q}</b> on market @ ${isk(f.hullMkt.min)}${pctTag(hullJita ? f.hullMkt.min / hullJita - 1 : null)}`
+        : `<span class="missline">none on market</span>`;
+      const cheapCon = (conByHull.get(f.hull) || []).find((c) => c.markup != null);
+      const hullCon = f.hullCon
+        ? `<b>${f.hullCon.n}</b> contracts from ${isk(f.hullCon.min)}${pctTag(cheapCon ? cheapCon.markup : null)}`
+        : `<span class="missline">no contracts</span>`;
       const miss = f.missing.length
         ? `<div class="missline">MISSING FROM XHQ MARKET: ${f.missing.map((m) => esc(m.name) + (m.qty > 1 ? " ×" + m.qty : "")).join(", ")}</div>`
         : `<div class="fitline ok-inline">✓ full fit available on XHQ market</div>`;
