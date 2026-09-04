@@ -116,6 +116,15 @@ body.no-flicker .crt::before { animation: none; opacity: 0.75; }
   display: flex; align-items: center; gap: 8px;
   font-size: 14px; color: var(--phosphor-dim); cursor: pointer;
 }
+.settings-desc {
+  font-size: 13px; color: var(--phosphor-dim); line-height: 2;
+  margin: 12px 0 0; max-width: 260px;
+}
+.settings-num {
+  width: 38px; background: #04120a; border: 1px solid var(--border); color: var(--phosphor);
+  font-family: inherit; font-size: 13px; padding: 1px 3px; text-align: center;
+}
+.settings-num:focus { outline: 1px solid var(--phosphor); }
 
 /* --- layout --- */
 .terminal {
