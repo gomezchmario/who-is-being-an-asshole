@@ -116,6 +116,7 @@
             <span class="flabel dim">VIEW</span>
             <button id="loss-all" class="fbtn" title="Show every doctrine hull lost — clears the HIDE thresholds">ALL</button>
             <button id="loss-mode" class="fbtn" title="Group hulls under their doctrine, in war-room order (Nightmares, TFI, Drakes first)">GROUP BY DOCTRINE</button>
+            <button id="loss-copy" class="fbtn" title="Copy the top 20 shown here as a paste-ready Multibuy list">COPY TOP 20</button>
             <span id="loss-hint" class="dim" style="font-size:12px"></span>
           </div>
           <div class="frow">
@@ -151,6 +152,7 @@
             <span class="flabel dim">VIEW</span>
             <button id="il-scope" class="fbtn" title="Include every destroyed module, not just ones used in a tracked doctrine fit — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
             <button id="il-all" class="fbtn" title="Show everything lost — clears the HIDE thresholds">CLEAR FILTERS</button>
+            <button id="il-copy" class="fbtn" title="Copy the top 20 shown here as a paste-ready Multibuy list">COPY TOP 20</button>
             <span id="il-hint" class="dim" style="font-size:12px"></span>
           </div>
           <div class="frow">
@@ -188,6 +190,7 @@
             <button id="ila-scope" class="fbtn" title="Include every destroyed ammo/drone, not just ones used in a tracked doctrine fit — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
             <button id="ila-all" class="fbtn" title="Show everything lost — clears the HIDE thresholds">CLEAR FILTERS</button>
             <button id="il-ammo-mode" class="fbtn" title="Group by weapon family and size, like the war room's missing-ammo list">GROUP BY TYPE</button>
+            <button id="ila-copy" class="fbtn" title="Copy the top 20 shown here as a paste-ready Multibuy list">COPY TOP 20</button>
             <span id="ila-hint" class="dim" style="font-size:12px"></span>
           </div>
           <div class="frow">
@@ -224,10 +227,10 @@
             <span class="flabel dim">VIEW</span>
             <button class="fbtn kind-btn on" data-kind="implants" title="Permanent cybernetics only">IMPLANTS</button>
             <button class="fbtn kind-btn" data-kind="drugs" title="Temporary boosters/doses only">DRUGS</button>
-            <button class="fbtn kind-btn" data-kind="all" title="Implants and drugs together">BOTH</button>
             <button id="ilp-scope" class="fbtn" title="Include every destroyed implant or drug, not just ones used in a tracked doctrine set/hardwiring — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
             <button id="ilp-all" class="fbtn" title="Show everything lost — clears the HIDE thresholds">CLEAR FILTERS</button>
             <button id="ilp-mode" class="fbtn" title="Group implants by set (grade + slot), hardwirings, and drugs separately, like the war room's missing-implants list">GROUP BY SET</button>
+            <button id="ilp-copy" class="fbtn" title="Copy the top 20 shown here as a paste-ready Multibuy list">COPY TOP 20</button>
             <span id="ilp-hint" class="dim" style="font-size:12px"></span>
           </div>
           <div class="frow">
@@ -424,6 +427,21 @@
     const filter = { f: "all", q: "" };
     const oppState = { whole: false, src: "jita", noHaul: false, touched: false, hideProfit: true, hideMoves: true };
     const lossFilters = { touched: false, hideLost: true, hideStock: true };
+    // Whatever's currently visible in each loss table, kept in sync by that
+    // table's own render function, so the COPY button always matches what's
+    // on screen — not a separate re-filtered query.
+    let shipCopyList = [], modCopyList = [], ammoCopyList = [], impCopyList = [];
+    function copyMultibuy(list, btn) {
+      const text = list.slice(0, 20).map((e) => `${e.name}\t1`).join("\n");
+      const flash = (label) => {
+        const orig = btn.dataset.label || btn.textContent;
+        btn.dataset.label = orig;
+        btn.textContent = label;
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      };
+      if (!text) { flash("NOTHING TO COPY"); return; }
+      navigator.clipboard.writeText(text).then(() => flash("COPIED!")).catch(() => flash("COPY FAILED"));
+    }
 
     // --- cost model, persisted per browser ---
     const PKEYS = ["p-isoly", "p-ly", "p-isoprice", "p-flat", "p-cap", "p-haul", "p-broker", "p-tax", "p-margin"];
@@ -554,6 +572,7 @@
         if (lossFilters.hideLost) visible = visible.filter((e) => e.n >= num($("lost-min").value, 5));
         if (lossFilters.hideStock) visible = visible.filter((e) => e.months <= num($("stock-max").value, 3));
       }
+      shipCopyList = visible;
 
       let html;
       if (lossFilters.touched && lossState.grouped && docOrder.length) {
@@ -670,6 +689,7 @@
 
     function renderModuleLosses() {
       const rows = lossRows(CATSETS.mods, "il", modState);
+      modCopyList = rows;
       $("il-mod-body").innerHTML = rows.map(itemLossRowHtml).join("")
         || `<tr><td class="left dim" colspan="4">no ${modState.scope === "all" ? "" : "doctrine "}module losses recorded yet</td></tr>`;
       $("il-hint").textContent = modState.touched ? "" : "— TOP 10 BY LOSSES · touch a filter for the full board";
@@ -677,6 +697,7 @@
 
     function renderAmmoTable() {
       const entries = lossRows(CATSETS.ammo, "ila", ammoState);
+      ammoCopyList = entries;
       const emptyRow = `<tr><td class="left dim" colspan="4">no ${ammoState.scope === "all" ? "" : "doctrine "}ammo/drone losses recorded yet</td></tr>`;
       if (!ilAmmoState.grouped) {
         $("il-ammo-body").innerHTML = entries.map(itemLossRowHtml).join("") || emptyRow;
@@ -698,11 +719,10 @@
     }
 
     function renderImpTable() {
-      const kindFilter = impState.kind === "implants" ? (l) => !isDrugName(l.name)
-        : impState.kind === "drugs" ? (l) => isDrugName(l.name)
-        : () => true;
+      const kindFilter = impState.kind === "implants" ? (l) => !isDrugName(l.name) : (l) => isDrugName(l.name);
       const entries = lossRows(CATSETS.imp, "ilp", impState, kindFilter);
-      const emptyRow = `<tr><td class="left dim" colspan="4">no ${impState.scope === "all" ? "" : "doctrine "}${impState.kind === "all" ? "implant/drug" : impState.kind} losses recorded yet</td></tr>`;
+      impCopyList = entries;
+      const emptyRow = `<tr><td class="left dim" colspan="4">no ${impState.scope === "all" ? "" : "doctrine "}${impState.kind} losses recorded yet</td></tr>`;
       if (!ilImpState.grouped) {
         $("il-imp-body").innerHTML = entries.map(itemLossRowHtml).join("") || emptyRow;
       } else {
@@ -1021,6 +1041,10 @@
         renderImpTable();
       });
     }
+    $("loss-copy").addEventListener("click", () => copyMultibuy(shipCopyList, $("loss-copy")));
+    $("il-copy").addEventListener("click", () => copyMultibuy(modCopyList, $("il-copy")));
+    $("ila-copy").addEventListener("click", () => copyMultibuy(ammoCopyList, $("ila-copy")));
+    $("ilp-copy").addEventListener("click", () => copyMultibuy(impCopyList, $("ilp-copy")));
     $("opp-scope").addEventListener("click", () => {
       oppTouch();
       oppState.whole = !oppState.whole;
