@@ -252,10 +252,10 @@
       }
       const isDrugName = (n) => /Booster$|\sDose\s/.test(n);
       const loadsOf = (e) => Math.floor(e.q / e.maxQ);
-      // Under 3 fit-loads of ammo, or under 3 doses of a drug, counts as
+      // Under 3 fit-loads of ammo, or under 8 doses of a drug, counts as
       // not available.
       const lowAmmo = [...agg.values()].filter((e) => [8, 18, 87].includes(e.cat) && loadsOf(e) < 3);
-      const lowDrugs = [...agg.values()].filter((e) => e.cat === 20 && isDrugName(e.name) && e.q < 3);
+      const lowDrugs = [...agg.values()].filter((e) => e.cat === 20 && isDrugName(e.name) && e.q < 8);
 
       const ammoList = [
         ...(data.missingAmmo || []),
@@ -342,7 +342,7 @@
       stockedTable("stocked-ammo",
         [...agg.values()].filter((e) => [8, 18, 87].includes(e.cat) && loadsOf(e) >= 3).sort(byLoads), true);
       stockedTable("stocked-implants",
-        [...agg.values()].filter((e) => e.cat === 20 && !(isDrugName(e.name) && e.q < 3)).sort((a, b) => a.q - b.q), false);
+        [...agg.values()].filter((e) => e.cat === 20 && !(isDrugName(e.name) && e.q < 8)).sort((a, b) => a.q - b.q), false);
 
       const ds = data.doctrines.slice();
       const pinned = [];
