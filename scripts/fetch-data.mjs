@@ -658,11 +658,12 @@ async function main() {
     }
     const unknownNameIds = [...new Set([...Object.keys(lossCount), ...Object.keys(itemLossCount)])]
       .map(Number).filter((id) => !names[id]);
-    if (unknownNameIds.length) {
+    for (let i = 0; i < unknownNameIds.length; i += 900) {
+      const chunk = unknownNameIds.slice(i, i + 900);
       const res = await esiJson(`${ESI}/universe/names/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(unknownNameIds),
+        body: JSON.stringify(chunk),
       });
       for (const n of res.json || []) names[n.id] = n.name;
     }
