@@ -165,7 +165,21 @@ input[type="number"]:focus { outline: 1px solid var(--phosphor); }
 input[type="checkbox"] { accent-color: var(--phosphor-dim); }
 
 /* --- filter buttons --- */
-.filters .sep { color: var(--phosphor-faint); }
+.frow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 5px 0;
+}
+.frow + .frow { border-top: 1px dashed var(--phosphor-faint); }
+
+.flabel {
+  font-size: 12px;
+  letter-spacing: 0.25em;
+  width: 52px;
+  flex-shrink: 0;
+}
 
 .fbtn {
   background: #04120a;
