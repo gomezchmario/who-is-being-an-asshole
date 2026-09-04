@@ -85,10 +85,10 @@ body.no-flicker .crt::before { animation: none; opacity: 0.75; }
 .clock-wrap { display: inline-flex; align-items: center; gap: 6px; }
 .gear-btn {
   background: none; border: none; padding: 0; cursor: pointer;
-  color: var(--phosphor-faint); font-size: 14px; line-height: 1;
+  color: var(--phosphor-dim); font-size: 14px; line-height: 1;
   transition: color 0.15s, transform 0.15s;
 }
-.gear-btn:hover { color: var(--phosphor-dim); transform: rotate(25deg); }
+.gear-btn:hover { color: var(--phosphor); transform: rotate(25deg); }
 
 .settings-overlay {
   position: fixed; inset: 0; z-index: 50;
