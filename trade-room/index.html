@@ -57,6 +57,10 @@
       letter-spacing: 0.08em; margin: 14px 0 4px;
     }
     .subhead:first-of-type { margin-top: 4px; }
+    summary.subhead { cursor: pointer; list-style: none; }
+    summary.subhead::-webkit-details-marker { display: none; }
+    summary.subhead::before { content: "▸ "; }
+    details[open] > summary.subhead::before { content: "▾ "; }
   </style>
 </head>
 <body>
@@ -180,16 +184,22 @@
           <tbody id="il-mod-body"></tbody>
         </table></div>
 
-        <div class="subhead">AMMO + DRONES</div>
-        <div class="tablewrap"><table class="tr-table" id="il-ammo-table">
-          <thead><tr>
-            <th class="left">ITEM</th>
-            <th class="num">LOST / 30D</th>
-            <th class="num">XHQ STOCK</th>
-            <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
-          </tr></thead>
-          <tbody id="il-ammo-body"></tbody>
-        </table></div>
+        <details>
+          <summary class="subhead">AMMO + DRONES</summary>
+          <div class="frow" style="margin:2px 0 8px">
+            <span class="flabel dim">SORT</span>
+            <button id="il-ammo-mode" class="fbtn" title="Group by weapon family and size, like the war room's missing-ammo list">GROUP BY TYPE</button>
+          </div>
+          <div class="tablewrap"><table class="tr-table" id="il-ammo-table">
+            <thead><tr>
+              <th class="left">ITEM</th>
+              <th class="num">LOST / 30D</th>
+              <th class="num">XHQ STOCK</th>
+              <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
+            </tr></thead>
+            <tbody id="il-ammo-body"></tbody>
+          </table></div>
+        </details>
 
         <p class="note" style="margin-bottom:0">Destroyed and dropped both count — either way someone needs a new one. Red = the Fort holds less than one month of replacements.</p>
       </div>
@@ -539,6 +549,28 @@
     // split into two mini-tables by category.
     const ilState = { scope: "doctrine", touched: false };
     const ilFilters = { hideLost: true, hideStock: true };
+    const ilAmmoState = { grouped: false };
+
+    // Same family/size grouping as the war room's missing-ammo list, so
+    // destroyed ammo reads the same way as unstocked ammo does there.
+    const AMMO_FAMILIES = [
+      ["MISSILES", (n) => /Missile|Rocket|Torpedo|Defender/i.test(n)],
+      ["HYBRID CHARGES", (n) => /Antimatter|Iridium|Iron Charge|Lead Charge|Tungsten|Thorium|Uranium Charge|Plutonium|Javelin [SML]|Spike|Null [SMLX]|Void [SMLX]|Coil Gun|Gauss/i.test(n)],
+      ["PROJECTILE AMMO", (n) => /EMP [SMLX]|Fusion|Phased Plasma|Titanium Sabot|Carbonized|Nuclear [SMLX]|Proton [SMLX]|Barrage|Hail [SMLX]|Quake|Tremor|Depleted Uranium/i.test(n)],
+      ["LASER CRYSTALS", (n) => /Multifrequency|Standard [SMLX]|Infrared|Microwave|Radio [SMLX]|Ultraviolet|Xray|Gamma [SMLX]|Scorch|Conflagration|Aurora|Gleam/i.test(n)],
+      ["EXOTIC PLASMA", (n) => /Baryon|Tetryon|Meson|Occult|Mystic [SMLX]|Condenser Pack|ElectroPunch|GalvaSurge|SlamBolt|StrikeSnipe/i.test(n)],
+      ["BOMBS", (n) => /Bomb/i.test(n)],
+      ["CAP BOOSTERS", (n) => /Cap Booster/i.test(n)],
+      ["PROBES & MISC", () => true],
+    ];
+    const ammoSizeRank = (n) => {
+      if (/\bXL\b|XL Torpedo|XL Cruise/i.test(n)) return 4;
+      if (/ L$| L \(|Large|Cruise Missile|(?<!XL )Torpedo/i.test(n)) return 3;
+      if (/ M$|Medium|Heavy Missile|Heavy Assault/i.test(n)) return 2;
+      if (/ S$|Small|Light Missile|Rocket/i.test(n)) return 1;
+      return 0;
+    };
+    const AMMO_GROUP_ORDER = [...AMMO_FAMILIES.map(([k]) => k).slice(0, -1), "DRONES", "PROBES & MISC"];
 
     function itemLossRows(cats) {
       const stockOf = new Map((data.items || []).map((i) => [i.id, i.xhq?.q || 0]));
@@ -547,7 +579,7 @@
         .map((l) => {
           const stock = stockOf.get(l.id) || 0;
           const months = l.n ? stock / l.n : Infinity;
-          return { id: l.id, name: l.name, n: l.n, stock, months };
+          return { id: l.id, name: l.name, n: l.n, cat: l.cat, stock, months };
         });
       if (!ilState.touched) return entries.sort((a, b) => b.n - a.n).slice(0, 10);
       if (ilFilters.hideLost) entries = entries.filter((e) => e.n >= num($("il-lost-min").value, 100));
@@ -565,13 +597,32 @@
       </tr>`;
     }
 
+    function renderAmmoTable() {
+      const entries = itemLossRows(CATSETS.ammo);
+      const emptyRow = `<tr><td class="left dim" colspan="4">no ${ilState.scope === "all" ? "" : "doctrine "}ammo/drone losses recorded yet</td></tr>`;
+      if (!ilAmmoState.grouped) {
+        $("il-ammo-body").innerHTML = entries.map(itemLossRowHtml).join("") || emptyRow;
+        return;
+      }
+      const groups = new Map();
+      const put = (k, e) => { if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); };
+      for (const e of entries) {
+        if (e.cat === 18) put("DRONES", e);
+        else put((AMMO_FAMILIES.find(([, re]) => re(e.name)) || AMMO_FAMILIES.at(-1))[0], e);
+      }
+      const order = AMMO_GROUP_ORDER.filter((k) => groups.has(k));
+      $("il-ammo-body").innerHTML = order.map((k) => {
+        const items = groups.get(k).sort((a, b) => ammoSizeRank(a.name) - ammoSizeRank(b.name) || b.n - a.n);
+        return `<tr><td colspan="4" class="left" style="color:var(--amber);letter-spacing:0.1em;padding-top:10px">▸ ${esc(k)}</td></tr>` +
+          items.map(itemLossRowHtml).join("");
+      }).join("") || emptyRow;
+    }
+
     function renderItemLosses() {
       const mods = itemLossRows(CATSETS.mods);
-      const ammo = itemLossRows(CATSETS.ammo);
       $("il-mod-body").innerHTML = mods.map(itemLossRowHtml).join("")
         || `<tr><td class="left dim" colspan="4">no ${ilState.scope === "all" ? "" : "doctrine "}module losses recorded yet</td></tr>`;
-      $("il-ammo-body").innerHTML = ammo.map(itemLossRowHtml).join("")
-        || `<tr><td class="left dim" colspan="4">no ${ilState.scope === "all" ? "" : "doctrine "}ammo/drone losses recorded yet</td></tr>`;
+      renderAmmoTable();
       $("il-hint").textContent = ilState.touched ? "" : "— TOP 10 BY LOSSES EACH · touch a filter for the full board";
     }
 
@@ -841,6 +892,11 @@
     $("il-lost-min").addEventListener("input", () => { ilTouch(); renderItemLosses(); });
     $("il-f-stock").addEventListener("click", () => { ilTouch(); ilFilters.hideStock = !ilFilters.hideStock; $("il-f-stock").classList.toggle("on", ilFilters.hideStock); syncIlAll(); renderItemLosses(); });
     $("il-stock-max").addEventListener("input", () => { ilTouch(); renderItemLosses(); });
+    $("il-ammo-mode").addEventListener("click", () => {
+      ilAmmoState.grouped = !ilAmmoState.grouped;
+      $("il-ammo-mode").classList.toggle("on", ilAmmoState.grouped);
+      renderAmmoTable();
+    });
     $("opp-scope").addEventListener("click", () => {
       oppTouch();
       oppState.whole = !oppState.whole;
