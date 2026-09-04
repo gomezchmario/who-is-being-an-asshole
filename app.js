@@ -35,6 +35,16 @@
   const filters = { min: true, minDir: "<", minMode: "unit", qty: false, qtyDir: "<", cat: "all" };
   const vFilter = new Set(); // empty = show every verdict
   let touched = false; // table stays empty until the visitor picks a filter
+  const flipped = new Set(); // type_ids whose AVG reference is flipped to Jita
+
+  // Effective reference for a row: AVG-referenced rows can be flipped to
+  // their Jita price by clicking the tag.
+  function effOf(o) {
+    if (o.gal && o.alt != null && flipped.has(o.type_id)) {
+      return { ref: o.alt, markup: o.price / o.alt - 1, tag: "JITA" };
+    }
+    return { ref: o.jita, markup: o.markup, tag: o.gal ? "AVG" : null };
+  }
 
   function parseAmt(id, fallback) {
     const raw = ($(id).value || "").trim().toLowerCase().replace(/,/g, "");
@@ -141,11 +151,13 @@
 
     const orders = (data.orders || []).slice();
     orders.sort((a, b) => {
-      let va = a[sort.key], vb = b[sort.key];
       if (sort.key === "name") {
-        va = va || ""; vb = vb || "";
-        return sort.dir * va.localeCompare(vb);
+        return sort.dir * (a.name || "").localeCompare(b.name || "");
       }
+      let va, vb;
+      if (sort.key === "markup") { va = effOf(a).markup; vb = effOf(b).markup; }
+      else if (sort.key === "jita") { va = effOf(a).ref; vb = effOf(b).ref; }
+      else { va = a[sort.key]; vb = b[sort.key]; }
       return sort.dir * ((va ?? -Infinity) - (vb ?? -Infinity));
     });
     for (const th of document.querySelectorAll("th.sortable")) {
@@ -158,15 +170,21 @@
       if (o.jita == null || o.markup == null) { noJita++; continue; } // nothing to judge against
       if (!passesFilters(o)) continue;
       judged++;
-      const isOffender = Math.round(o.markup * 100) >= Math.round(threshold * 100);
+      const eff = effOf(o);
+      const isOffender = Math.round(eff.markup * 100) >= Math.round(threshold * 100);
       if (isOffender) offenders++;
       if (!isOffender && !showAll) continue;
 
-      const v = verdictFor(o.markup, threshold);
+      const v = verdictFor(eff.markup, threshold);
       if (vFilter.size && !vFilter.has(v.tier)) continue;
       const tr = document.createElement("tr");
       tr.className = "tier" + v.tier;
       const structName = structNames[o.location_id] || "structure " + o.location_id;
+      const tagHtml = eff.tag
+        ? ` <span class="galtag${o.alt != null ? " galclick" : ""}"${o.alt != null ? ` data-tid="${o.type_id}"` : ""} title="${eff.tag === "AVG"
+            ? "Judged against the galaxy-wide average price" + (o.alt != null ? " — click to compare vs Jita" : " (nothing sold in Jita)")
+            : "Compared against Jita — click to go back to the galaxy average"}">${eff.tag}</span>`
+        : "";
       tr.innerHTML = `
         <td class="left ${v.cls}"><span class="verdict">${v.label}</span></td>
         <td class="left">
@@ -175,8 +193,8 @@
         </td>
         <td class="num">${o.volume.toLocaleString("en-US")}</td>
         <td class="num">${fmtIsk(o.price)}</td>
-        <td class="num">${fmtIsk(o.jita)}${o.gal ? ' <span class="galtag" title="Judged against the galaxy-wide average price (capital/fighter gear, or nothing sold in Jita)">AVG</span>' : ""}</td>
-        <td class="num markup">${o.markup >= 0 ? "+" : ""}${Math.round(o.markup * 100)}%</td>`;
+        <td class="num">${fmtIsk(eff.ref)}${tagHtml}</td>
+        <td class="num markup">${eff.markup >= 0 ? "+" : ""}${Math.round(eff.markup * 100)}%</td>`;
       rows.push(tr);
     }
 
@@ -245,7 +263,7 @@
       structures: { "1035949018593": "XHQ-7V - Immortalis Fortizar" },
       orders: [
         { type_id: 12005, name: "Ishtar", price: 412000000, jita: 318000000, volume: 3, location_id: "1035949018593", markup: 0.2956, cat: 6 },
-        { type_id: 19722, name: "Naglfar", price: 5900000000, jita: 3480000000, volume: 2, location_id: "1035949018593", markup: 0.6954, cat: 6, capital: 1, gal: 1 },
+        { type_id: 19722, name: "Naglfar", price: 5900000000, jita: 3480000000, volume: 2, location_id: "1035949018593", markup: 0.6954, cat: 6, capital: 1, gal: 1, alt: 4200000000 },
         { type_id: 41443, name: "Capital Ancillary Shield Booster", price: 99000000, jita: 62000000, volume: 4, location_id: "1035949018593", markup: 0.5968, cat: 7, capital: 1 },
         { type_id: 2048,  name: "Damage Control II", price: 2100000, jita: 690000, volume: 14, location_id: "1035949018593", markup: 2.0435, cat: 7 },
         { type_id: 12058, name: "Nanite Repair Paste", price: 38000, jita: 30500, volume: 5000, location_id: "1035949018593", markup: 0.2459, cat: 8 },
@@ -318,6 +336,13 @@
     wake();
   });
   $("qty-value").addEventListener("input", wake);
+  $("results-body").addEventListener("click", (e) => {
+    const tag = e.target.closest(".galclick");
+    if (!tag) return;
+    const tid = Number(tag.dataset.tid);
+    flipped.has(tid) ? flipped.delete(tid) : flipped.add(tid);
+    render();
+  });
   $("search").addEventListener("input", wake);
   $("min-value").addEventListener("input", wake);
   $("threshold").addEventListener("input", wake);

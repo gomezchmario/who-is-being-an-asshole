@@ -323,6 +323,7 @@ async function main() {
       location_id: String(o.location_id),
       cat,
       ...(gal && { gal: 1 }),
+      ...(useAvg && jita[o.type_id] != null && { alt: jita[o.type_id] }),
       ...(capital && { capital: 1 }),
     };
   });

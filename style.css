@@ -342,6 +342,8 @@ th.sortable .arrow { color: var(--amber); }
   padding: 0 3px;
   letter-spacing: 0.06em;
 }
+.galclick { cursor: pointer; }
+.galclick:hover { background: var(--amber); color: #1c1000; }
 
 .abytag {
   color: #c86bff;
