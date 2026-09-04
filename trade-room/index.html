@@ -190,6 +190,10 @@
     <details class="doctrine" open>
       <summary>BUY ORDER BOUNTIES — FILL XHQ BUY ORDERS FOR PROFIT</summary>
       <div class="inner">
+        <div class="frow" style="padding-top:0">
+          <span class="flabel dim">COSTS</span>
+          <button id="buy-nohaul" class="fbtn on" title="Treat hauling as free — e.g. filling orders with stock you already have on site, or topping off a haul you were making anyway">IGNORE HAULING</button>
+        </div>
         <div class="tablewrap"><table class="tr-table" id="buy-table">
           <thead><tr>
             <th class="left sortable">ITEM<span class="arrow"></span></th>
@@ -491,6 +495,7 @@
     }
 
     // Buy orders across XHQ structures vs the cheapest way to fill them.
+    const buyState = { noHaul: true };
     function renderBuys() {
       const m = model();
       const tax = num($("p-tax").value, 4.48) / 100;
@@ -499,7 +504,7 @@
         .map((b) => {
           const it = byId.get(b.id);
           if (!it || it.vol == null) return null;
-          const haul = it.vol * m.haul;
+          const haul = buyState.noHaul ? 0 : it.vol * m.haul;
           const cands = [];
           if (it.xhq) cands.push(["XHQ", it.xhq.min]);
           if (it.jita != null) cands.push(["JITA", it.jita + haul]);
@@ -624,6 +629,11 @@
     $("q").addEventListener("input", () => { oppTouch(); filter.q = $("q").value.trim().toLowerCase(); renderOpps(); });
     attachSort($("opp-table"));
     attachSort($("buy-table"));
+    $("buy-nohaul").addEventListener("click", () => {
+      buyState.noHaul = !buyState.noHaul;
+      $("buy-nohaul").classList.toggle("on", buyState.noHaul);
+      renderBuys();
+    });
     // Losses table: custom sort handlers (column click returns to flat mode).
     {
       const KEYS = ["name", "n", "hulls", "cons", "months"];
