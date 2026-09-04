@@ -135,13 +135,11 @@
             <th class="left">DEMAND</th>
             <th class="num sortable">XHQ STOCK<span class="arrow"></span></th>
             <th class="num sortable">SELL @<span class="arrow"></span></th>
-            <th class="num sortable">JITA<span class="arrow"></span></th>
-            <th class="num sortable">m³<span class="arrow"></span></th>
             <th class="num sortable">PROFIT/U<span class="arrow"></span></th>
             <th class="num sortable">PROFIT/m³<span class="arrow"></span></th>
             <th class="num sortable" title="Average units traded per day in Providence over 30 days (ESI market history)">MOVES/D<span class="arrow"></span></th>
             <th class="num sortable" title="profit per unit × daily volume — the realistic daily profit ceiling">ISK/DAY<span class="arrow"></span></th>
-            <th class="num sortable" title="profit / (Jita cost + haul)">ROI<span class="arrow"></span></th>
+            
           </tr></thead>
           <tbody id="opp-body"></tbody>
         </table></div>
@@ -392,20 +390,17 @@
         if (it.ind) tags.push('<span class="demandtag d-low">INDUSTRY</span>');
         const pcls = profit > 0 ? "profit-pos" : "profit-neg";
         rows.push(`<tr>
-          <td class="left" data-v="${esc(it.name)}">${esc(it.name)}</td>
+          <td class="left" data-v="${esc(it.name)}">${esc(it.name)}<span class="struct">JITA ${isk(it.jita)} · ${it.vol} m³</span></td>
           <td class="left">${tags.join(" ")}</td>
           <td class="num" data-v="${it.xhq?.q || 0}">${it.xhq ? it.xhq.q.toLocaleString("en-US") : "—"}</td>
           <td class="num" data-v="${sell}">${isk(sell)}</td>
-          <td class="num" data-v="${it.jita}">${isk(it.jita)}</td>
-          <td class="num" data-v="${it.vol}">${it.vol}</td>
           <td class="num ${pcls}" data-v="${profit}">${isk(profit)}</td>
           <td class="num ${pcls}" data-v="${pm3}">${isk(pm3)}</td>
           <td class="num" data-v="${mov}">${mov >= 100 ? Math.round(mov).toLocaleString("en-US") : mov}</td>
           <td class="num ${pcls}" data-v="${iskday}">${isk(iskday)}</td>
-          <td class="num ${pcls}" data-v="${isFinite(roi) ? roi : -9}">${isFinite(roi) ? Math.round(roi * 100) + "%" : "—"}</td>
         </tr>`);
       }
-      $("opp-body").innerHTML = rows.join("") || '<tr><td class="left dim" colspan="11">nothing matches</td></tr>';
+      $("opp-body").innerHTML = rows.join("") || '<tr><td class="left dim" colspan="8">nothing matches</td></tr>';
     }
 
     function renderMfg() {
