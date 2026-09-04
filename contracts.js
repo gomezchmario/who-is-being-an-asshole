@@ -65,6 +65,7 @@
 
     const scalpView = filters.cat === "scalp" || filters.cat === "scalplog";
     $("scalp-notice").classList.toggle("hidden", !(scalpView && new Date() < NOTICE_UNTIL));
+    document.querySelector('.cbtn[data-cat="scalplog"]').hidden = !scalpView;
 
     if (filters.cat === "scalplog") { renderLog(threshold); return; }
 
