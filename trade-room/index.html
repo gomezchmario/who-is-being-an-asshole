@@ -161,10 +161,10 @@
           <div class="frow">
             <span class="flabel dim">HIDE</span>
             <button id="il-f-lost" class="fbtn on" title="Hide items with fewer losses than this">LOST &lt;</button>
-            <input type="text" id="il-lost-min" value="5" spellcheck="false">
+            <input type="text" id="il-lost-min" value="100" spellcheck="false">
             <span class="sep dim">│</span>
             <button id="il-f-stock" class="fbtn on" title="Hide items already stocked for more than this many months">STOCK &gt;</button>
-            <input type="text" id="il-stock-max" value="3" spellcheck="false">
+            <input type="text" id="il-stock-max" value="0.3" spellcheck="false">
             <span class="dim">MONTHS</span>
           </div>
         </div>
@@ -550,8 +550,8 @@
           return { id: l.id, name: l.name, n: l.n, stock, months };
         });
       if (!ilState.touched) return entries.sort((a, b) => b.n - a.n).slice(0, 10);
-      if (ilFilters.hideLost) entries = entries.filter((e) => e.n >= num($("il-lost-min").value, 5));
-      if (ilFilters.hideStock) entries = entries.filter((e) => e.months <= num($("il-stock-max").value, 3));
+      if (ilFilters.hideLost) entries = entries.filter((e) => e.n >= num($("il-lost-min").value, 100));
+      if (ilFilters.hideStock) entries = entries.filter((e) => e.months <= num($("il-stock-max").value, 0.3));
       return entries.sort((a, b) => b.n - a.n).slice(0, 200);
     }
 
