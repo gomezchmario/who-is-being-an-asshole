@@ -376,6 +376,13 @@ tr.gonerow td { opacity: 0.6; }
   text-shadow: 0 0 6px rgba(255, 176, 0, 0.35);
 }
 
+.fbtn.lookup {
+  border-color: #c86bff; color: #dd9bff;
+  text-shadow: 0 0 8px rgba(200, 107, 255, 0.7);
+  box-shadow: 0 0 8px rgba(200, 107, 255, 0.35);
+}
+.fbtn.lookup:hover { border-color: #e0b3ff; color: #f0d6ff; }
+
 .fbtn.scalper { border-color: var(--red); color: var(--red); }
 .fbtn.scalper:hover { color: #ff7a7a; border-color: #ff7a7a; }
 .fbtn.scalper.on {

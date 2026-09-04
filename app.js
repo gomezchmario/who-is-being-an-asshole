@@ -117,7 +117,7 @@
       b.classList.toggle("on", b.dataset.cat === filters.cat);
     }
     for (const b of document.querySelectorAll(".vbtn")) {
-      b.classList.toggle("on", b.dataset.v === "all" ? vFilter.size === 0 : vFilter.has(Number(b.dataset.v)));
+      b.classList.toggle("on", vFilter.size === 0 || (b.dataset.v !== "all" && vFilter.has(Number(b.dataset.v))));
     }
   }
 
@@ -293,7 +293,7 @@
         vFilter.has(t) ? vFilter.delete(t) : vFilter.add(t);
       }
       for (const b of document.querySelectorAll(".vbtn")) {
-        b.classList.toggle("on", b.dataset.v === "all" ? vFilter.size === 0 : vFilter.has(Number(b.dataset.v)));
+        b.classList.toggle("on", vFilter.size === 0 || (b.dataset.v !== "all" && vFilter.has(Number(b.dataset.v))));
       }
       wake();
     });
