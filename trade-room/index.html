@@ -192,8 +192,11 @@
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow" style="padding-top:0">
+            <span class="flabel dim">MODE</span>
+            <button id="buy-export" class="fbtn" title="Reverse direction: find XHQ sell orders cheap enough to buy, haul out, and resell at Jita or Amarr">EXPORT TO HUBS</button>
+            <span class="sep dim">│</span>
             <span class="flabel dim">SCOPE</span>
-            <button id="buy-scope" class="fbtn" title="Include public buy orders across all of Providence and Catch (richest 500), not just this system">PROVIDENCE + CATCH</button>
+            <button id="buy-scope" class="fbtn" title="Include public buy orders across all of Providence and Catch (richest 500), not just this system — buy-order mode only">PROVIDENCE + CATCH</button>
             <span class="sep dim">│</span>
             <span class="flabel dim">COSTS</span>
             <button id="buy-nohaul" class="fbtn on" title="Treat hauling as free — e.g. filling orders with stock you already have on site, or topping off a haul you were making anyway">IGNORE HAULING</button>
@@ -514,14 +517,33 @@
     }
 
     // Buy orders across XHQ structures vs the cheapest way to fill them.
-    const buyState = { noHaul: true, hidePm3: false, hideTotal: true, hideMarkup: true, regional: false };
+    const buyState = { noHaul: true, hidePm3: false, hideTotal: true, hideMarkup: true, regional: false, export: false };
     function renderBuys() {
       const m = model();
       const tax = num($("p-tax").value, 4.48) / 100;
       const byId = new Map((data.items || []).map((i) => [i.id, i]));
-      const source = buyState.regional ? data.rbuys : data.buys;
-      const rows = (source || [])
-        .map((b) => {
+      let raw;
+      if (buyState.export) {
+        // Reverse direction: buy XHQ sell orders, resell at the better hub
+        // (listing there pays broker fee + sales tax).
+        raw = (data.items || [])
+          .filter((it) => it.xhq && it.vol != null && (it.jita != null || it.amarr != null))
+          .map((it) => {
+            const haul = buyState.noHaul ? 0 : it.vol * m.haul;
+            const cands = [];
+            if (it.jita != null) cands.push(["JITA", it.jita * 0.999 * (1 - m.fees)]);
+            if (it.amarr != null) cands.push(["AMARR", it.amarr * 0.999 * (1 - m.fees)]);
+            cands.sort((a, c) => c[1] - a[1]);
+            const [src, net] = cands[0];
+            const cost = it.xhq.min + haul;
+            const profit = net - cost;
+            const total = profit * it.xhq.q;
+            const pm3 = profit / it.vol;
+            return { it, b: { p: it.xhq.min, q: it.xhq.q, tq: it.xhq.q }, src, cost, profit, total, pm3 };
+          });
+      } else {
+        const source = buyState.regional ? data.rbuys : data.buys;
+        raw = (source || []).map((b) => {
           const it = byId.get(b.id);
           if (!it || it.vol == null) return null;
           const haul = buyState.noHaul ? 0 : it.vol * m.haul;
@@ -536,7 +558,9 @@
           const total = profit * b.q;
           const pm3 = profit / it.vol;
           return { it, b, src, cost, profit, total, pm3 };
-        })
+        });
+      }
+      const rows = raw
         .filter((x) => x && x.profit > 0)
         .filter((x) => !buyState.hideMarkup || x.profit / x.cost >= num($("buy-markup-min").value, 15) / 100)
         .filter((x) => !buyState.hidePm3 || x.pm3 >= num($("buy-pm3-min").value, 1000))
@@ -550,7 +574,7 @@
       };
       $("buy-body").innerHTML = rows.map(({ it, b, src, cost, profit, total }) => `
         <tr>
-          <td class="left" data-v="${esc(it.name)}">${esc(it.name)}<span class="struct">${it.vol} m³ · total demand ${b.tq.toLocaleString("en-US")}${b.sys ? " · deliver: " + esc(b.sys) : ""}</span></td>
+          <td class="left" data-v="${esc(it.name)}">${esc(it.name)}<span class="struct">${it.vol} m³ · ${buyState.export ? "XHQ stock" : "total demand"} ${b.tq.toLocaleString("en-US")}${b.sys ? " · deliver: " + esc(b.sys) : ""}</span></td>
           <td class="num" data-v="${b.p}">${isk(b.p)}</td>
           <td class="num" data-v="${b.q}">${b.q.toLocaleString("en-US")}${b.tq > b.q ? ` <span class="dim">(${b.tq.toLocaleString("en-US")})</span>` : ""}</td>
           <td class="left" data-v="${src}">${src === "XHQ" ? '<span class="ok-inline" style="color:var(--phosphor)">XHQ (no haul)</span>' : `<span class="d-low demandtag">${src}</span>`}</td>
@@ -559,7 +583,12 @@
           <td class="num profit-pos" data-v="${profit}">${isk(profit)}</td>
           <td class="num profit-pos" data-v="${total}">${isk(total)}</td>
         </tr>`).join("") ||
-        '<tr><td class="left dim" colspan="8">no buy orders clear your thresholds — loosen the HIDE filters or widen the scope</td></tr>';
+        '<tr><td class="left dim" colspan="8">nothing clears your thresholds — loosen the HIDE filters or widen the scope</td></tr>';
+      // Column labels follow the mode.
+      const ths = document.querySelectorAll("#buy-table th");
+      ths[1].firstChild.textContent = buyState.export ? "XHQ ASK" : "BUY @";
+      ths[2].firstChild.textContent = buyState.export ? "STOCK" : "WANTED";
+      ths[3].firstChild.textContent = buyState.export ? "SELL AT" : "BEST SOURCE";
     }
 
     function renderMfg() {
@@ -659,6 +688,11 @@
     $("q").addEventListener("input", () => { oppTouch(); filter.q = $("q").value.trim().toLowerCase(); renderOpps(); });
     attachSort($("opp-table"));
     attachSort($("buy-table"));
+    $("buy-export").addEventListener("click", () => {
+      buyState.export = !buyState.export;
+      $("buy-export").classList.toggle("on", buyState.export);
+      renderBuys();
+    });
     $("buy-scope").addEventListener("click", () => {
       buyState.regional = !buyState.regional;
       $("buy-scope").classList.toggle("on", buyState.regional);
