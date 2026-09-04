@@ -25,7 +25,7 @@ const authUrl =
     response_type: "code",
     redirect_uri: `http://localhost:${PORT}/callback`,
     client_id: clientId,
-    scope: "esi-markets.structure_markets.v1",
+    scope: "esi-markets.structure_markets.v1 esi-contracts.read_character_contracts.v1",
     state,
   });
 

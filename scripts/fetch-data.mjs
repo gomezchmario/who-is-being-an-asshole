@@ -22,7 +22,7 @@ const KNOWN_NAMES = { 1035949018593: "XHQ-7V - Immortalis Fortizar" };
 const ESI = "https://esi.evetech.net/latest";
 const UA = "who-is-being-an-asshole (github.com self-hosted market tool)";
 
-const { EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_REFRESH_TOKEN, JANICE_API_KEY } = process.env;
+const { EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_REFRESH_TOKEN, EVE_REFRESH_TOKEN_CVA, JANICE_API_KEY } = process.env;
 if (!EVE_CLIENT_ID || !EVE_CLIENT_SECRET || !EVE_REFRESH_TOKEN || !JANICE_API_KEY) {
   console.error("Missing EVE_CLIENT_ID / EVE_CLIENT_SECRET / EVE_REFRESH_TOKEN / JANICE_API_KEY env vars.");
   process.exit(1);
@@ -44,7 +44,7 @@ async function esiJson(url, opts = {}, retries = 3) {
   }
 }
 
-async function getAccessToken() {
+async function getAccessToken(refreshToken = EVE_REFRESH_TOKEN) {
   const basic = Buffer.from(`${EVE_CLIENT_ID}:${EVE_CLIENT_SECRET}`).toString("base64");
   const res = await fetch("https://login.eveonline.com/v2/oauth/token", {
     method: "POST",
@@ -53,10 +53,13 @@ async function getAccessToken() {
       "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent": UA,
     },
-    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: EVE_REFRESH_TOKEN }),
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
   });
   if (!res.ok) throw new Error(`SSO token refresh failed: HTTP ${res.status}: ${await res.text()}`);
-  return (await res.json()).access_token;
+  const tok = (await res.json()).access_token;
+  // Character id lives in the JWT subject: "CHARACTER:EVE:12345678"
+  const sub = JSON.parse(Buffer.from(tok.split(".")[1], "base64url").toString()).sub;
+  return { token: tok, characterId: Number(sub.split(":").pop()) };
 }
 
 async function inBatches(items, size, fn) {
@@ -78,8 +81,19 @@ async function fetchPaginated(url, headers) {
 }
 
 async function main() {
-  const token = await getAccessToken();
+  const main = await getAccessToken();
+  const token = main.token;
   const auth = { Authorization: `Bearer ${token}` };
+  // Characters whose alliance/corp-assigned contracts we can see. The CVAA
+  // and CVA views differ, so one toon per alliance.
+  const chars = [{ label: "CVAA", ...main }];
+  if (EVE_REFRESH_TOKEN_CVA) {
+    try {
+      chars.push({ label: "CVA", ...(await getAccessToken(EVE_REFRESH_TOKEN_CVA)) });
+    } catch (e) {
+      console.warn("CVA token refresh failed, continuing without:", e.message);
+    }
+  }
 
   // 1. Discover market structures in XHQ-7V from the public regional feed
   //    (structure buy orders are public and reveal structure IDs).
@@ -154,6 +168,27 @@ async function main() {
       if (structureIds.has(c.start_location_id) && c.type === "item_exchange") contractsRaw.push(c);
     }
   }
+  // 2b2. Alliance/corp-assigned contracts, invisible in the public feed —
+  //      visible through each logged-in character's contract list.
+  const privateOf = {}; // contract_id -> character (for the items endpoint)
+  {
+    const seen = new Set(contractsRaw.map((c) => c.contract_id));
+    for (const ch of chars) {
+      const cauth = { Authorization: `Bearer ${ch.token}` };
+      const mine = await fetchPaginated(`${ESI}/characters/${ch.characterId}/contracts/`, cauth);
+      let added = 0;
+      for (const c of mine.items || []) {
+        if (c.status !== "outstanding" || c.type !== "item_exchange") continue;
+        if (!structureIds.has(c.start_location_id)) continue;
+        if (seen.has(c.contract_id)) continue;
+        seen.add(c.contract_id);
+        contractsRaw.push({ ...c, av: c.availability });
+        privateOf[c.contract_id] = ch;
+        added++;
+      }
+      console.log(`${ch.label} (${ch.characterId}): +${added} non-public contracts.`);
+    }
+  }
   const itemsCacheFile = new URL("../contract-items.json", import.meta.url);
   let itemsCache = {};
   try {
@@ -162,11 +197,14 @@ async function main() {
   } catch {}
   const newContracts = contractsRaw.filter((c) => itemsCache[c.contract_id] == null);
   await inBatches(newContracts, 15, async (c) => {
-    const res = await esiJson(`${ESI}/contracts/public/items/${c.contract_id}/`);
+    const ch = privateOf[c.contract_id];
+    const res = ch
+      ? await esiJson(`${ESI}/characters/${ch.characterId}/contracts/${c.contract_id}/items/`, { headers: { Authorization: `Bearer ${ch.token}` } })
+      : await esiJson(`${ESI}/contracts/public/items/${c.contract_id}/`);
     if (res.error) { itemsCache[c.contract_id] = []; return; }
     // [type_id, quantity, included(1/0), bpc(1/0), item_id(0 if none)]
     itemsCache[c.contract_id] = (res.json || []).map((i) => [
-      i.type_id, i.quantity, i.is_included ? 1 : 0, i.is_blueprint_copy ? 1 : 0, i.item_id || 0,
+      i.type_id, i.quantity, i.is_included ? 1 : 0, i.is_blueprint_copy ? 1 : 0, i.item_id || i.record_id || 0,
     ]);
   });
   // Prune expired/completed contracts from the cache.
@@ -413,6 +451,7 @@ async function main() {
       ...(unpriced && { est: 1 }),
       ...(swap && { swap: 1 }),
       ...(aby && { aby: 1 }),
+      ...(c.av && c.av !== "public" && { av: c.av }),
       ...(scalp && { scalp }),
     };
   });

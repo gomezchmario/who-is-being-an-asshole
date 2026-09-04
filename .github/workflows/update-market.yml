@@ -27,6 +27,7 @@ jobs:
           EVE_CLIENT_ID: ${{ secrets.EVE_CLIENT_ID }}
           EVE_CLIENT_SECRET: ${{ secrets.EVE_CLIENT_SECRET }}
           EVE_REFRESH_TOKEN: ${{ secrets.EVE_REFRESH_TOKEN }}
+          EVE_REFRESH_TOKEN_CVA: ${{ secrets.EVE_REFRESH_TOKEN_CVA }}
           JANICE_API_KEY: ${{ secrets.JANICE_API_KEY }}
         run: node scripts/fetch-data.mjs
 

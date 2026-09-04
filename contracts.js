@@ -122,7 +122,7 @@
       tr.innerHTML = `
         <td class="left ${v.cls}"><span class="verdict">${v.label}</span></td>
         <td class="left">
-          <span class="itemname">${escapeHtml(label)}</span>${c.doctrine ? ' <span class="galtag" title="Contains a CVA doctrine ship">DOCTRINE</span>' : ""}${c.aby ? ' <span class="abytag" title="Contains abyssal (mutated) modules — these can stand in for the doctrine’s normal modules but can’t be market-priced, so JITA VALUE understates this contract and the markup reads high">ABYSSAL</span>' : ""}${c.scalp ? ' <span class="scalptag" title="Same physical item bought cheaper and relisted">SCALP</span>' : ""}
+          <span class="itemname">${escapeHtml(label)}</span>${c.doctrine ? ' <span class="galtag" title="Contains a CVA doctrine ship">DOCTRINE</span>' : ""}${c.av ? ` <span class="galtag" style="color:var(--phosphor);border-color:var(--phosphor-dim)" title="Not public — assigned to ${c.av === "alliance" ? "the alliance" : c.av}">${c.av.toUpperCase()}</span>` : ""}${c.aby ? ' <span class="abytag" title="Contains abyssal (mutated) modules — these can stand in for the doctrine’s normal modules but can’t be market-priced, so JITA VALUE understates this contract and the markup reads high">ABYSSAL</span>' : ""}${c.scalp ? ' <span class="scalptag" title="Same physical item bought cheaper and relisted">SCALP</span>' : ""}
           <span class="struct${c.scalp ? " scalpline" : ""}">${escapeHtml(sub)}</span>
         </td>
         <td class="left"><a class="itemname" href="https://zkillboard.com/search/${encodeURIComponent(c.issuer)}/" target="_blank" rel="noopener">${escapeHtml(c.issuer)}</a></td>
