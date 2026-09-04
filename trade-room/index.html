@@ -415,7 +415,7 @@
       const T2RE = /\bII\b|Barrage|Hail|Quake|Tremor|Javelin|Spike|Null|Void|Scorch|Conflagration|Aurora|Gleam|Occult|Mystic|Baryon|Tetryon|Meson|Fury|Rage|Precision [SML]|ElectroPunch|GalvaSurge|SlamBolt|StrikeSnipe|Polarized/;
       const FACTION = /Navy|Fleet|Imperial|Republic|Federation|Caldari|Dread|Arch |Guristas|Sanshas|True |Shadow|Domination|Sisters|CONCORD|Syndicate|Thukker|Khanid|Mordus|'/;
       const cands = (data.items || [])
-        .filter((it) => [8, 18].includes(it.cat) && it.jita != null && !FACTION.test(it.name))
+        .filter((it) => [8, 18].includes(it.cat) && it.jita != null && !FACTION.test(it.name) && !/[A-Z]{2}-\d{3}-I/.test(it.name))
         .map((it) => {
           const missing = !it.xhq;
           const markup = it.xhq && it.jita ? it.xhq.min / it.jita - 1 : null;
