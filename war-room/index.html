@@ -252,8 +252,10 @@
       }
       const isDrugName = (n) => /Booster$|\sDose\s/.test(n);
       // Fighters (cat 87) come in squadrons of 9, so a "load" is 9 fighters
-      // regardless of what any single fit lists.
-      const loadsOf = (e) => Math.floor(e.q / (e.cat === 87 ? 9 : e.maxQ));
+      // regardless of what any single fit lists. Some items get manual load
+      // sizes (T2 crystals barely wear out — fits just list spares).
+      const LOAD_OVERRIDES = { "Scorch S": 4, "Conflagration S": 4 };
+      const loadsOf = (e) => Math.floor(e.q / (LOAD_OVERRIDES[e.name] ?? (e.cat === 87 ? 9 : e.maxQ)));
       // Ammo/drones need 3+ loads to count as stocked; fighters need MORE
       // than 3 squadron-loads.
       const lowAmmoCheck = (e) => (e.cat === 87 ? loadsOf(e) <= 3 : loadsOf(e) < 3);
