@@ -122,6 +122,7 @@
     }
 
     let conByHull = new Map(); // hull type_id -> contracts, filled from contracts.json
+    const lossOf = new Map();  // hull type_id -> losses last 30d, from trade.json
 
     function contractRows(hullId) {
       const cons = conByHull.get(hullId) || [];
@@ -159,6 +160,10 @@
       const hullCon = f.hullCon
         ? `<b>${f.hullCon.n}</b> contracts from ${isk(f.hullCon.min)}${pctTag(cheapCon ? cheapCon.markup : null)}`
         : `<span class="missline">no contracts</span>`;
+      const lost = lossOf.get(f.hull);
+      const lostPart = lost
+        ? ` · <span style="color:#c86bff" title="CVA + CVAA losses of this hull, last 30 days (zKillboard)"><b style="color:#c86bff">${lost}</b> lost/30d</span>`
+        : "";
       // Implants & boosters (cat 20) are judged separately from the fit itself.
       const isImp = (x) => x.cat === 20;
       const missFit = f.missing.filter((m) => !isImp(m));
@@ -218,7 +223,7 @@
             <span class="${conState[0]}" title="CONTRACTS — ${conState[1]}">CON</span>
           </div>
           <div class="fitname">${esc(f.t || f.hullName || "fit")}</div>
-          <div class="fitline">HULL ${esc(f.hullName || "?")}: ${hullMkt} · ${hullCon}</div>
+          <div class="fitline">HULL ${esc(f.hullName || "?")}: ${hullMkt} · ${hullCon}${lostPart}</div>
           <div class="fitline costs">
             <span>XHQ: <b>${isk(f.costXhq)}</b>${f.xhqPartial ? " ± (missing items excluded)" : ""}</span>
             <span>JITA: <b>${isk(f.costJita)}</b>${f.jitaPartial ? " ±" : ""}</span>
@@ -410,14 +415,17 @@
         .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
       fetch("../contracts.json", { cache: "no-cache" })
         .then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch("../trade.json", { cache: "no-cache" })
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ])
-      .then(([readiness, contracts]) => {
+      .then(([readiness, contracts, trade]) => {
         for (const c of contracts?.contracts || []) {
           if (!c.hull_id) continue;
           if (!conByHull.has(c.hull_id)) conByHull.set(c.hull_id, []);
           conByHull.get(c.hull_id).push(c);
         }
         for (const list of conByHull.values()) list.sort((a, b) => a.price - b.price);
+        for (const l of trade?.losses || []) lossOf.set(l.id, l.n);
         return readiness;
       })
       .then(render)
