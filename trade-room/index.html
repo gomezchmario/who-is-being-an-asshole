@@ -128,6 +128,9 @@
           <button class="fbtn cbtn" data-f="ships">SHIPS</button>
           <button class="fbtn cbtn" data-f="imp">IMPLANTS</button>
           <button class="fbtn cbtn" data-f="ind">INDUSTRY</button>
+          <span class="sep dim">│</span>
+          <button id="opp-scope" class="fbtn" title="Include every type sold on the XHQ market, not just doctrine and industry items">WHOLE MARKET</button>
+          <button id="opp-src" class="fbtn" title="Which hub you buy from — affects cost, profit and the unstocked sell price">BUY: JITA</button>
         </div>
         <div class="tablewrap"><table class="tr-table" id="opp-table">
           <thead><tr>
@@ -214,6 +217,7 @@
     let data = null, contracts = null;
     let isoJita = null; // Helium Isotopes Jita price, from trade data
     const filter = { f: "all", q: "" };
+    const oppState = { whole: false, src: "jita" };
 
     // --- cost model, persisted per browser ---
     const PKEYS = ["p-isoly", "p-ly", "p-isoprice", "p-flat", "p-cap", "p-haul", "p-broker", "p-tax", "p-margin"];
@@ -351,6 +355,7 @@
     };
 
     function passes(it) {
+      if (!oppState.whole && !(it.fits || it.ind || it.lost)) return false;
       if (filter.q && !it.name.toLowerCase().includes(filter.q)) return false;
       switch (filter.f) {
         case "miss": return !it.xhq;
@@ -369,11 +374,12 @@
 
       const rows = [];
       const list = (data.items || [])
-        .filter((it) => it.jita != null && it.vol != null && passes(it))
+        .filter((it) => (oppState.src === "amarr" ? it.amarr ?? it.jita : it.jita) != null && it.vol != null && passes(it))
         .map((it) => {
-          const sell = it.xhq ? it.xhq.min * 0.999 : it.jita * (1 + m.margin);
+          const buy = oppState.src === "amarr" ? (it.amarr ?? it.jita) : it.jita;
+          const sell = it.xhq ? it.xhq.min * 0.999 : buy * (1 + m.margin);
           const haul = it.vol * m.haul;
-          const profit = sell * (1 - m.fees) - it.jita - haul;
+          const profit = sell * (1 - m.fees) - buy - haul;
           const pm3 = profit / it.vol;
           const roi = profit / (it.jita + haul);
           const mov = it.mov || 0;
@@ -390,7 +396,7 @@
         if (it.ind) tags.push('<span class="demandtag d-low">INDUSTRY</span>');
         const pcls = profit > 0 ? "profit-pos" : "profit-neg";
         rows.push(`<tr>
-          <td class="left" data-v="${esc(it.name)}">${esc(it.name)}<span class="struct">JITA ${isk(it.jita)} · ${it.vol} m³</span></td>
+          <td class="left" data-v="${esc(it.name)}">${esc(it.name)}<span class="struct">${oppState.src === "amarr" ? "AMARR " + isk(it.amarr ?? it.jita) : "JITA " + isk(it.jita)} · ${it.vol} m³</span></td>
           <td class="left">${tags.join(" ")}</td>
           <td class="num" data-v="${it.xhq?.q || 0}">${it.xhq ? it.xhq.q.toLocaleString("en-US") : "—"}</td>
           <td class="num" data-v="${sell}">${isk(sell)}</td>
@@ -407,7 +413,7 @@
       const m = model();
       // T2 ammo carries no "II" — recognize the T2 charge families by name.
       const T2RE = /\bII\b|Barrage|Hail|Quake|Tremor|Javelin|Spike|Null|Void|Scorch|Conflagration|Aurora|Gleam|Occult|Mystic|Baryon|Tetryon|Meson|Fury|Rage|Precision [SML]|ElectroPunch|GalvaSurge|SlamBolt|StrikeSnipe|Polarized/;
-      const FACTION = /Navy|Fleet|Imperial|Republic|Federation|Caldari|Dread|Arch |Guristas|Sanshas|True |Shadow|Domination|'/;
+      const FACTION = /Navy|Fleet|Imperial|Republic|Federation|Caldari|Dread|Arch |Guristas|Sanshas|True |Shadow|Domination|Sisters|CONCORD|Syndicate|Thukker|Khanid|Mordus|'/;
       const cands = (data.items || [])
         .filter((it) => [8, 18].includes(it.cat) && it.jita != null && !FACTION.test(it.name))
         .map((it) => {
@@ -463,6 +469,16 @@
         renderOpps();
       });
     }
+    $("opp-scope").addEventListener("click", () => {
+      oppState.whole = !oppState.whole;
+      $("opp-scope").classList.toggle("on", oppState.whole);
+      renderOpps();
+    });
+    $("opp-src").addEventListener("click", () => {
+      oppState.src = oppState.src === "jita" ? "amarr" : "jita";
+      $("opp-src").textContent = "BUY: " + oppState.src.toUpperCase();
+      renderOpps();
+    });
     $("q").addEventListener("input", () => { filter.q = $("q").value.trim().toLowerCase(); renderOpps(); });
     attachSort($("opp-table"));
     // Losses table: custom sort handlers (column click returns to flat mode).

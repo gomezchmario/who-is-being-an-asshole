@@ -201,7 +201,7 @@ async function main() {
 
   // 3a. Amarr prices (Janice market 115) — doctrine + industry items.
   const amarr = {};
-  const amarrIds = [...new Set([...doctrineTypeIds, ...industryIds])];
+  const amarrIds = typeIds; // trade room can price against Amarr for anything
   for (let i = 0; i < amarrIds.length; i += 500) {
     const chunk = amarrIds.slice(i, i + 500);
     const res = await fetch(`https://janice.e-351.com/api/rest/v2/pricer?market=115`, {
@@ -542,7 +542,9 @@ async function main() {
       .map(([id, n]) => ({ id: +id, name: names[id] || `type ${id}`, n, cat: catCache[id]?.[1] ?? null, doctrine: doctrineShips.has(+id) ? 1 : 0 }))
       .sort((a, b) => b.n - a.n);
 
-    const tradeIds = [...new Set([...doctrineTypeIds, ...industryIds])];
+    // Whole-market coverage: everything on the XHQ market joins the trade set.
+    const marketTypeIds = [...new Set(sells.map((o) => o.type_id))];
+    const tradeIds = [...new Set([...doctrineTypeIds, ...industryIds, ...marketTypeIds])];
 
     // Regional market velocity: average daily traded volume over the last 30
     // days from ESI market history (includes structure trades). ~1 request
@@ -551,19 +553,30 @@ async function main() {
     let hist2 = { date: null, vols: {} };
     try { hist2 = JSON.parse(readFileSync(histFile, "utf8")); } catch {}
     const today = new Date().toISOString().slice(0, 10);
-    if (hist2.date !== today) {
-      const vols30 = {};
-      await inBatches(tradeIds, 5, async (tid) => {
+    const fetchHistory = async (ids, into) => {
+      await inBatches(ids, 5, async (tid) => {
         const res = await esiJson(`${ESI}/markets/${REGION_ID}/history/?type_id=${tid}`, {}, 1);
-        if (res?.error || !Array.isArray(res?.json)) { vols30[tid] = 0; return; }
+        if (res?.error || !Array.isArray(res?.json)) { into[tid] = 0; return; }
         const cutoff30 = Date.now() - 30 * 86400e3;
         const vol = res.json.filter((d) => new Date(d.date).getTime() >= cutoff30)
           .reduce((s, d) => s + d.volume, 0);
-        vols30[tid] = Math.round((vol / 30) * 100) / 100;
+        into[tid] = Math.round((vol / 30) * 100) / 100;
       });
+    };
+    if (hist2.date !== today) {
+      const vols30 = {};
+      await fetchHistory(tradeIds, vols30);
       hist2 = { date: today, vols: vols30 };
       writeFileSync(histFile, JSON.stringify(hist2));
       console.log(`Refreshed market history for ${tradeIds.length} types.`);
+    } else {
+      // Same day, but new types may have joined the set — top up just those.
+      const missing = tradeIds.filter((t) => hist2.vols[t] == null);
+      if (missing.length) {
+        await fetchHistory(missing, hist2.vols);
+        writeFileSync(histFile, JSON.stringify(hist2));
+        console.log(`Topped up market history for ${missing.length} new types.`);
+      }
     }
     const tradeItems = tradeIds.map((tid) => {
       const m = xhqMkt[tid];
