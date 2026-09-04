@@ -106,6 +106,7 @@
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
             <span class="flabel dim">VIEW</span>
+            <button id="loss-all" class="fbtn" title="Show every doctrine hull lost — clears the HIDE thresholds">ALL</button>
             <button id="loss-mode" class="fbtn" title="Group hulls under their doctrine, in war-room order (Nightmares, TFI, Drakes first)">GROUP BY DOCTRINE</button>
             <span id="loss-hint" class="dim" style="font-size:12px"></span>
           </div>
@@ -594,9 +595,19 @@
     $("profit-min").addEventListener("input", () => { oppTouch(); renderOpps(); });
     $("f-moves").addEventListener("click", () => { oppTouch(); oppState.hideMoves = !oppState.hideMoves; $("f-moves").classList.toggle("on", oppState.hideMoves); renderOpps(); });
     $("moves-min").addEventListener("input", () => { oppTouch(); renderOpps(); });
-    $("f-lost").addEventListener("click", () => { lossTouch(); lossFilters.hideLost = !lossFilters.hideLost; $("f-lost").classList.toggle("on", lossFilters.hideLost); renderLosses(); });
+    const syncLossAll = () => $("loss-all").classList.toggle("on", !lossFilters.hideLost && !lossFilters.hideStock && lossFilters.touched);
+    $("loss-all").addEventListener("click", () => {
+      lossTouch();
+      lossFilters.hideLost = false;
+      lossFilters.hideStock = false;
+      $("f-lost").classList.remove("on");
+      $("f-stock").classList.remove("on");
+      syncLossAll();
+      renderLosses();
+    });
+    $("f-lost").addEventListener("click", () => { lossTouch(); lossFilters.hideLost = !lossFilters.hideLost; $("f-lost").classList.toggle("on", lossFilters.hideLost); syncLossAll(); renderLosses(); });
     $("lost-min").addEventListener("input", () => { lossTouch(); renderLosses(); });
-    $("f-stock").addEventListener("click", () => { lossTouch(); lossFilters.hideStock = !lossFilters.hideStock; $("f-stock").classList.toggle("on", lossFilters.hideStock); renderLosses(); });
+    $("f-stock").addEventListener("click", () => { lossTouch(); lossFilters.hideStock = !lossFilters.hideStock; $("f-stock").classList.toggle("on", lossFilters.hideStock); syncLossAll(); renderLosses(); });
     $("stock-max").addEventListener("input", () => { lossTouch(); renderLosses(); });
     $("opp-scope").addEventListener("click", () => {
       oppTouch();
