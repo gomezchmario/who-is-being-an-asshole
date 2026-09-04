@@ -386,6 +386,8 @@ footer {
   padding-top: 8px;
 }
 
+.visitors { color: var(--phosphor-dim); }
+
 .credit {
   font-family: "VT323", monospace;
   font-size: 22px;
