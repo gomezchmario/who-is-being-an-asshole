@@ -146,7 +146,31 @@
           : '<li class="ok-inline">nothing missing — miracle confirmed</li>';
       };
       fillMissing("missing-ammo", data.missingAmmo || []);
-      fillMissing("missing-implants", data.missingImplants || []);
+
+      // Implants grouped by set: "Mid-grade Amulet Gamma" -> set "Mid-grade
+      // Amulet", piece "Gamma". Hardwirings collect at the bottom.
+      const sets = new Map();
+      const hardwirings = [];
+      for (const m of data.missingImplants || []) {
+        const sm = m.name.match(/^((?:Low|Mid|High)-grade [A-Za-z]+) (Alpha|Beta|Gamma|Delta|Epsilon|Omega)$/) ||
+                   m.name.match(/^(Genolution Core Augmentation) (CA-\d)$/);
+        if (sm) {
+          if (!sets.has(sm[1])) sets.set(sm[1], []);
+          sets.get(sm[1]).push(sm[2]);
+        } else hardwirings.push(m.name);
+      }
+      const SLOT_ORDER = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Omega", "CA-1", "CA-2", "CA-3", "CA-4"];
+      const setRows = [...sets.entries()]
+        .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+        .map(([set, pieces]) => {
+          pieces.sort((a, b) => SLOT_ORDER.indexOf(a) - SLOT_ORDER.indexOf(b));
+          return `<li><b>${esc(set)}</b> <span class="dim">— missing ${pieces.length}:</span> ${pieces.map(esc).join(", ")}</li>`;
+        });
+      const hwRows = hardwirings.sort().map((n) => `<li>${esc(n)}</li>`);
+      $("missing-implants").innerHTML = setRows.length + hwRows.length
+        ? setRows.join("") +
+          (hwRows.length ? `<li class="dim" style="margin-top:6px">HARDWIRINGS &amp; BOOSTERS:</li>` + hwRows.join("") : "")
+        : '<li class="ok-inline">nothing missing — miracle confirmed</li>';
       $("missing-wrap").classList.remove("hidden");
 
       const ds = data.doctrines.slice();
