@@ -200,12 +200,16 @@
           </div>
           <div class="frow">
             <span class="flabel dim">HIDE</span>
+            <button id="buy-markup" class="fbtn on" title="Hide fills returning less than this percent on cost">MARKUP &lt;</button>
+            <input type="text" id="buy-markup-min" value="15" spellcheck="false">
+            <span class="dim">%</span>
+            <span class="sep dim">│</span>
             <button id="buy-pm3" class="fbtn" title="Hide fills earning less than this per m³ hauled">PROFIT/m³ &lt;</button>
             <input type="text" id="buy-pm3-min" value="1,000" spellcheck="false">
             <span class="dim">ISK</span>
             <span class="sep dim">│</span>
             <button id="buy-total" class="fbtn on" title="Hide fills whose total profit is below this">TOTAL &lt;</button>
-            <input type="text" id="buy-total-min" value="10,000,000" spellcheck="false">
+            <input type="text" id="buy-total-min" value="5,000,000" spellcheck="false">
             <span class="dim">ISK</span>
           </div>
         </div>
@@ -510,7 +514,7 @@
     }
 
     // Buy orders across XHQ structures vs the cheapest way to fill them.
-    const buyState = { noHaul: true, hidePm3: false, hideTotal: true, regional: false };
+    const buyState = { noHaul: true, hidePm3: false, hideTotal: true, hideMarkup: true, regional: false };
     function renderBuys() {
       const m = model();
       const tax = num($("p-tax").value, 4.48) / 100;
@@ -534,8 +538,9 @@
           return { it, b, src, cost, profit, total, pm3 };
         })
         .filter((x) => x && x.profit > 0)
+        .filter((x) => !buyState.hideMarkup || x.profit / x.cost >= num($("buy-markup-min").value, 15) / 100)
         .filter((x) => !buyState.hidePm3 || x.pm3 >= num($("buy-pm3-min").value, 1000))
-        .filter((x) => !buyState.hideTotal || x.total >= num($("buy-total-min").value, 10000000))
+        .filter((x) => !buyState.hideTotal || x.total >= num($("buy-total-min").value, 5000000))
         .sort((a, c) => c.total - a.total)
         .slice(0, 50);
       const haulerBadge = (cargo) => {
@@ -554,7 +559,7 @@
           <td class="num profit-pos" data-v="${profit}">${isk(profit)}</td>
           <td class="num profit-pos" data-v="${total}">${isk(total)}</td>
         </tr>`).join("") ||
-        '<tr><td class="left dim" colspan="8">no buy orders clear your thresholds — loosen the HIDE filters, widen the scope, or the buyers are stingy today</td></tr>';
+        '<tr><td class="left dim" colspan="8">no buy orders clear your thresholds — loosen the HIDE filters or widen the scope</td></tr>';
     }
 
     function renderMfg() {
@@ -664,6 +669,12 @@
       $("buy-nohaul").classList.toggle("on", buyState.noHaul);
       renderBuys();
     });
+    $("buy-markup").addEventListener("click", () => {
+      buyState.hideMarkup = !buyState.hideMarkup;
+      $("buy-markup").classList.toggle("on", buyState.hideMarkup);
+      renderBuys();
+    });
+    $("buy-markup-min").addEventListener("input", renderBuys);
     $("buy-pm3").addEventListener("click", () => {
       buyState.hidePm3 = !buyState.hidePm3;
       $("buy-pm3").classList.toggle("on", buyState.hidePm3);
