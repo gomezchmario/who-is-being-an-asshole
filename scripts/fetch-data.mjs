@@ -10,7 +10,10 @@ import { writeFileSync } from "node:fs";
 const SYSTEM_ID = 30003731; // XHQ-7V
 const REGION_ID = 10000047; // Providence
 const JANICE_MARKET = 2; // Jita 4-4
-const KNOWN_STRUCTURES = [1035949018593]; // Immortalis Fortizar
+const KNOWN_STRUCTURES = [1035949018593];
+// Name lookup via /universe/structures/ needs an extra scope
+// (esi-universe.read_structures.v1) the token may not have; fall back here.
+const KNOWN_NAMES = { 1035949018593: "XHQ-7V - Immortalis Fortizar" };
 const ESI = "https://esi.evetech.net/latest";
 const UA = "who-is-being-an-asshole (github.com self-hosted market tool)";
 
@@ -27,7 +30,7 @@ async function esiJson(url, opts = {}, retries = 3) {
       headers: { "User-Agent": UA, Accept: "application/json", ...(opts.headers || {}) },
     });
     if (res.ok) return { json: await res.json(), headers: res.headers };
-    if (res.status === 403 || res.status === 404) return { error: res.status };
+    if (res.status === 401 || res.status === 403 || res.status === 404) return { error: res.status };
     if (i < retries && (res.status === 420 || res.status >= 500)) {
       await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
       continue;
@@ -83,7 +86,7 @@ async function main() {
   const sells = [...publicSells];
   for (const sid of structureIds) {
     const info = await esiJson(`${ESI}/universe/structures/${sid}/`, { headers: auth });
-    structures[sid] = info.error ? `structure ${sid}` : info.json.name;
+    structures[sid] = info.error ? KNOWN_NAMES[sid] || `structure ${sid}` : info.json.name;
 
     const book = await fetchPaginated(`${ESI}/markets/structures/${sid}/`, auth);
     if (book.error) {
