@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../style.css?v=13">
+  <link rel="stylesheet" href="../style.css?v=14">
   <style>
     details.doctrine { border: 1px solid var(--border); background: var(--panel); margin-bottom: 10px; }
     details.doctrine > summary {
@@ -98,6 +98,9 @@
     <details class="doctrine" open>
       <summary>DOCTRINE SHIPS DYING (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
+        <div class="searchbar">
+          <button id="loss-mode" class="fbtn" title="Group hulls under their doctrine, in war-room order (Nightmares, TFI, Drakes first)">GROUP BY DOCTRINE</button>
+        </div>
         <div class="tablewrap"><table class="tr-table" id="loss-table">
           <thead><tr>
             <th class="left sortable">SHIP<span class="arrow"></span></th>
@@ -260,26 +263,84 @@
       }));
     }
 
+    // Doctrine ordering shared with the war room: Nightmares, TFI, Drakes
+    // pinned first. Built from readiness.json; hull id -> doctrine index.
+    let docOrder = [];        // ordered doctrine names
+    let hullDoc = new Map();  // hull type_id -> index into docOrder
+    const lossState = { grouped: false, key: "n", dir: -1 };
+
+    function buildDoctrineOrder(readiness) {
+      if (!readiness) return;
+      const PINNED = [/nightmare|lunatach/i, /tempest/i, /drake/i];
+      const ds = readiness.doctrines.slice();
+      const ordered = [];
+      for (const re of PINNED) {
+        const idx = ds.findIndex((d) => re.test(d.name));
+        if (idx >= 0) ordered.push(ds.splice(idx, 1)[0]);
+      }
+      ordered.push(...ds);
+      docOrder = ordered.map((d) => d.name);
+      ordered.forEach((d, i) => {
+        for (const f of d.fits) {
+          if (f.hull && !hullDoc.has(f.hull)) hullDoc.set(f.hull, i);
+        }
+      });
+    }
+
     function renderLosses() {
       const conByHull = new Map();
       for (const c of contracts?.contracts || []) {
         if (c.hull_id) conByHull.set(c.hull_id, (conByHull.get(c.hull_id) || 0) + 1);
       }
       const stockOf = new Map((data.items || []).map((i) => [i.id, i.xhq?.q || 0]));
-      const rows = (data.losses || []).filter((l) => l.doctrine).map((l) => {
+      const entries = (data.losses || []).filter((l) => l.doctrine).map((l) => {
         const hulls = stockOf.get(l.id) || 0;
         const cons = conByHull.get(l.id) || 0;
         const months = l.n ? (hulls + cons) / l.n : Infinity;
-        const bad = months < 1;
+        return { id: l.id, name: l.name, n: l.n, hulls, cons, months };
+      });
+
+      const rowHtml = (e) => {
+        const bad = e.months < 1;
         return `<tr class="${bad ? "tier3" : ""}">
-          <td class="left" data-v="${esc(l.name)}">${esc(l.name)}${bad ? ' <span class="demandtag d-miss">RESTOCK</span>' : ""}</td>
-          <td class="num" data-v="${l.n}">${l.n}</td>
-          <td class="num" data-v="${hulls}">${hulls}</td>
-          <td class="num" data-v="${cons}">${cons}</td>
-          <td class="num" data-v="${isFinite(months) ? months.toFixed(1) : 999}">${isFinite(months) ? months.toFixed(1) : "∞"}</td>
+          <td class="left"><a class="itemname" href="https://zkillboard.com/ship/${e.id}/losses/" target="_blank" rel="noopener" title="View these losses on zKillboard">${esc(e.name)}</a>${bad ? ' <span class="demandtag d-miss">RESTOCK</span>' : ""}</td>
+          <td class="num">${e.n}</td>
+          <td class="num">${e.hulls}</td>
+          <td class="num">${e.cons}</td>
+          <td class="num">${isFinite(e.months) ? e.months.toFixed(1) : "∞"}</td>
         </tr>`;
-      }).join("");
-      $("loss-body").innerHTML = rows || '<tr><td class="left dim" colspan="5">no doctrine losses recorded yet — killboard history builds up with each scan</td></tr>';
+      };
+
+      let html;
+      if (lossState.grouped && docOrder.length) {
+        const groups = new Map();
+        for (const e of entries) {
+          const di = hullDoc.has(e.id) ? hullDoc.get(e.id) : -1;
+          if (!groups.has(di)) groups.set(di, []);
+          groups.get(di).push(e);
+        }
+        const keys = [...groups.keys()].sort((a, b) => (a === -1 ? 1e9 : a) - (b === -1 ? 1e9 : b));
+        html = keys.map((di) => {
+          const ships = groups.get(di).sort((a, b) => b.n - a.n);
+          const label = di === -1 ? "OTHER DOCTRINE HULLS" : docOrder[di];
+          return `<tr><td colspan="5" class="left" style="color:var(--amber);letter-spacing:0.1em;padding-top:10px">▸ ${esc(label)}</td></tr>` +
+            ships.map(rowHtml).join("");
+        }).join("");
+      } else {
+        const k = lossState.key;
+        entries.sort((a, b) => k === "name"
+          ? lossState.dir * a.name.localeCompare(b.name)
+          : lossState.dir * ((a[k] ?? -Infinity) - (b[k] ?? -Infinity)));
+        html = entries.map(rowHtml).join("");
+      }
+      $("loss-body").innerHTML = html || '<tr><td class="left dim" colspan="5">no doctrine losses recorded yet — killboard history builds up with each scan</td></tr>';
+
+      const ths = [...document.querySelectorAll("#loss-table th")];
+      const KEYS = ["name", "n", "hulls", "cons", "months"];
+      ths.forEach((th, i) => {
+        const a = th.querySelector(".arrow");
+        if (a) a.textContent = !lossState.grouped && KEYS[i] === lossState.key ? (lossState.dir === 1 ? " ▲" : " ▼") : " ·";
+      });
     }
 
     const CATSETS = {
@@ -381,8 +442,10 @@
     Promise.all([
       fetch("../trade.json", { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
       fetch("../contracts.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    ]).then(([t, c]) => {
+      fetch("../readiness.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([t, c, rd]) => {
       data = t; contracts = c;
+      buildDoctrineOrder(rd);
       isoJita = t.items.find((i) => i.name === "Helium Isotopes")?.jita || null;
       $("status").textContent = "";
       renderAll();
@@ -401,7 +464,24 @@
     }
     $("q").addEventListener("input", () => { filter.q = $("q").value.trim().toLowerCase(); renderOpps(); });
     attachSort($("opp-table"));
-    attachSort($("loss-table"));
+    // Losses table: custom sort handlers (column click returns to flat mode).
+    {
+      const KEYS = ["name", "n", "hulls", "cons", "months"];
+      [...document.querySelectorAll("#loss-table th")].forEach((th, i) => {
+        th.addEventListener("click", () => {
+          lossState.grouped = false;
+          $("loss-mode").classList.remove("on");
+          if (lossState.key === KEYS[i]) lossState.dir = -lossState.dir;
+          else { lossState.key = KEYS[i]; lossState.dir = KEYS[i] === "name" ? 1 : -1; }
+          renderLosses();
+        });
+      });
+      $("loss-mode").addEventListener("click", () => {
+        lossState.grouped = !lossState.grouped;
+        $("loss-mode").classList.toggle("on", lossState.grouped);
+        renderLosses();
+      });
+    }
   })();
   </script>
 </body>
