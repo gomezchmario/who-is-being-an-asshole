@@ -2,7 +2,7 @@
  * Runs in GitHub Actions on a schedule. Requires env vars:
  *   EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_REFRESH_TOKEN, JANICE_API_KEY
  * (character needs docking access to the market structure and the
- *  esi-markets.structure_market_access.v1 scope; Janice keys are handed
+ *  esi-markets.structure_markets.v1 scope; Janice keys are handed
  *  out on the E-351 Discord — see README)
  */
 import { writeFileSync } from "node:fs";

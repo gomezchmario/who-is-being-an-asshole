@@ -16,7 +16,7 @@ and names every sell order priced more than **20% above Jita 4-4**.
 At [developers.eveonline.com/applications](https://developers.eveonline.com/applications):
 
 - Connection type: **Authentication & API Access**
-- Scope: `esi-markets.structure_market_access.v1`
+- Scope: `esi-markets.structure_markets.v1`
 - Callback URL: `http://localhost:8787/callback`
 
 ### 2. Get a refresh token (one time, locally)

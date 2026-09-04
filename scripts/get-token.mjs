@@ -2,7 +2,7 @@
  *
  * 1. Create an app at https://developers.eveonline.com/applications
  *    - Connection type: Authentication & API Access
- *    - Scope: esi-markets.structure_market_access.v1
+ *    - Scope: esi-markets.structure_markets.v1
  *    - Callback URL: http://localhost:8787/callback
  * 2. Run:  node scripts/get-token.mjs <CLIENT_ID> <CLIENT_SECRET>
  * 3. Log in with the character that has docking access to the structure.
@@ -25,7 +25,7 @@ const authUrl =
     response_type: "code",
     redirect_uri: `http://localhost:${PORT}/callback`,
     client_id: clientId,
-    scope: "esi-markets.structure_market_access.v1",
+    scope: "esi-markets.structure_markets.v1",
     state,
   });
 
