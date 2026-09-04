@@ -278,6 +278,18 @@ header { position: relative; }
 .blink { animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
+#search {
+  background: #04120a;
+  border: 1px solid var(--border);
+  color: var(--phosphor);
+  font-family: inherit;
+  font-size: 14px;
+  padding: 5px 10px;
+  width: 220px;
+  align-self: center;
+}
+#search:focus { outline: 1px solid var(--phosphor); }
+
 /* --- summary --- */
 .summary {
   font-family: "VT323", monospace;

@@ -44,6 +44,8 @@
   const sort = { key: "markup", dir: -1 };
 
   function passesFilters(o) {
+    const q = $("search").value.trim().toLowerCase();
+    if (q && !(o.name || "").toLowerCase().includes(q)) return false;
     if (filters.min && o.price < minValue()) return false;
     if (filters.cat === "all") return true;
     if (filters.cat === "doctrine") return doctrineTypes.has(o.type_id);
@@ -249,6 +251,7 @@
     });
   }
 
+  $("search").addEventListener("input", render);
   $("min-value").addEventListener("input", render);
   $("threshold").addEventListener("input", render);
   $("show-all").addEventListener("change", render);
