@@ -298,22 +298,29 @@ async function main() {
     const raw = JSON.parse(readFileSync(catCacheFile, "utf8"));
     for (const [k, v] of Object.entries(raw)) if (Array.isArray(v)) catCache[k] = v;
   } catch {}
-  const unknownTypes = typeIds.filter((t) => catCache[t] == null);
-  const typeGroups = {};
-  await inBatches(unknownTypes, 20, async (tid) => {
-    const res = await esiJson(`${ESI}/universe/types/${tid}/`);
-    if (!res.error) typeGroups[tid] = res.json.group_id;
-  });
-  const groupCats = {};
-  await inBatches([...new Set(Object.values(typeGroups))], 20, async (gid) => {
-    const res = await esiJson(`${ESI}/universe/groups/${gid}/`);
-    if (!res.error) groupCats[gid] = res.json.category_id;
-  });
-  for (const [tid, gid] of Object.entries(typeGroups)) {
-    if (groupCats[gid] != null) catCache[tid] = [gid, groupCats[gid]];
+  // Resolves and caches the [group, category] of any ids not already known.
+  // Returns how many new ids were actually looked up.
+  async function categorizeTypes(ids) {
+    const unknown = [...new Set(ids)].filter((t) => catCache[t] == null);
+    if (!unknown.length) return 0;
+    const typeGroups = {};
+    await inBatches(unknown, 20, async (tid) => {
+      const res = await esiJson(`${ESI}/universe/types/${tid}/`);
+      if (!res.error) typeGroups[tid] = res.json.group_id;
+    });
+    const groupCats = {};
+    await inBatches([...new Set(Object.values(typeGroups))], 20, async (gid) => {
+      const res = await esiJson(`${ESI}/universe/groups/${gid}/`);
+      if (!res.error) groupCats[gid] = res.json.category_id;
+    });
+    for (const [tid, gid] of Object.entries(typeGroups)) {
+      if (groupCats[gid] != null) catCache[tid] = [gid, groupCats[gid]];
+    }
+    writeFileSync(catCacheFile, JSON.stringify(catCache));
+    return unknown.length;
   }
-  writeFileSync(catCacheFile, JSON.stringify(catCache));
-  console.log(`Categorized ${unknownTypes.length} new types (cache now ${Object.keys(catCache).length}).`);
+  const newTypeCats = await categorizeTypes(typeIds);
+  console.log(`Categorized ${newTypeCats} new types (cache now ${Object.keys(catCache).length}).`);
 
   // 3c. Galaxy-wide average prices (CCP's in-game estimate) as reference for
   //     anything Jita has no sell orders for — capital hulls, mostly.
@@ -572,11 +579,20 @@ async function main() {
     console.log(`Wrote readiness.json: ${doctrines.length} doctrines.`);
 
     // 8. Trade room: alliance losses from zKillboard (30 days, cached) +
-    //    consolidated per-type supply data.
+    //    consolidated per-type supply data. Each cached kill also keeps its
+    //    victim's fitted/cargo item breakdown, so destroyed modules and
+    //    ammo/drones can be tallied the same way as hull losses.
     const ALLIANCES = { 1988009451: "CVA", 99010240: "CVAA" };
+    // Module, Charge, Drone, Subsystem — drones count alongside ammo, not
+    // modules, since they're consumed the same way.
+    const ITEM_LOSS_CATS = new Set([7, 8, 18, 32]);
     const zkFile = new URL("../zkill-cache.json", import.meta.url);
     let zk = {};
     try { zk = JSON.parse(readFileSync(zkFile, "utf8")).kills || {}; } catch {}
+    // Normalize legacy [shipTypeId, dateStr] tuples to the richer shape.
+    for (const [id, rec] of Object.entries(zk)) {
+      if (Array.isArray(rec)) zk[id] = { s: rec[0], d: rec[1], items: [] };
+    }
     const cutoff = Date.now() - 30 * 86400e3;
     const hardCutoff = Date.now() - 35 * 86400e3;
     for (const aid of Object.keys(ALLIANCES)) {
@@ -595,31 +611,57 @@ async function main() {
           if (zk[km.killmail_id]) { sawKnown = true; continue; }
           const t = new Date(km.killmail_time).getTime();
           if (t < hardCutoff) break pages;
-          if (km.victim?.ship_type_id) zk[km.killmail_id] = [km.victim.ship_type_id, km.killmail_time.slice(0, 10)];
+          if (km.victim?.ship_type_id) {
+            // Destroyed and dropped both count — either way the alliance
+            // needs to buy a replacement.
+            const itemTally = new Map();
+            for (const it of km.victim.items || []) {
+              const qty = (it.quantity_destroyed || 0) + (it.quantity_dropped || 0);
+              if (qty > 0) itemTally.set(it.item_type_id, (itemTally.get(it.item_type_id) || 0) + qty);
+            }
+            zk[km.killmail_id] = { s: km.victim.ship_type_id, d: km.killmail_time.slice(0, 10), items: [...itemTally] };
+          }
         }
         if (sawKnown) break;
         await new Promise((r) => setTimeout(r, 1100)); // be polite to zkill
       }
     }
-    for (const [id, [, d]] of Object.entries(zk)) {
-      if (new Date(d).getTime() < hardCutoff) delete zk[id];
+    for (const [id, rec] of Object.entries(zk)) {
+      if (new Date(rec.d).getTime() < hardCutoff) delete zk[id];
     }
     writeFileSync(zkFile, JSON.stringify({ kills: zk }));
     const lossCount = {};
-    for (const [ship, d] of Object.values(zk)) {
-      if (new Date(d).getTime() >= cutoff) lossCount[ship] = (lossCount[ship] || 0) + 1;
+    const itemLossCount = {};
+    for (const rec of Object.values(zk)) {
+      if (new Date(rec.d).getTime() < cutoff) continue;
+      lossCount[rec.s] = (lossCount[rec.s] || 0) + 1;
+      for (const [tid, qty] of rec.items || []) itemLossCount[tid] = (itemLossCount[tid] || 0) + qty;
     }
-    const unknownShipIds = Object.keys(lossCount).map(Number).filter((id) => !names[id]);
-    if (unknownShipIds.length) {
+    // Ship hulls were already categorized in the main type pass; destroyed
+    // items (any module/ammo/drone, doctrine or not) usually weren't.
+    const newItemCats = await categorizeTypes(Object.keys(itemLossCount).map(Number));
+    if (newItemCats) console.log(`Categorized ${newItemCats} destroyed-item types.`);
+    for (const tid of Object.keys(itemLossCount)) {
+      if (!ITEM_LOSS_CATS.has(catCache[tid]?.[1])) delete itemLossCount[tid];
+    }
+    const unknownNameIds = [...new Set([...Object.keys(lossCount), ...Object.keys(itemLossCount)])]
+      .map(Number).filter((id) => !names[id]);
+    if (unknownNameIds.length) {
       const res = await esiJson(`${ESI}/universe/names/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(unknownShipIds),
+        body: JSON.stringify(unknownNameIds),
       });
       for (const n of res.json || []) names[n.id] = n.name;
     }
     const losses = Object.entries(lossCount)
       .map(([id, n]) => ({ id: +id, name: names[id] || `type ${id}`, n, cat: catCache[id]?.[1] ?? null, doctrine: doctrineShips.has(+id) ? 1 : 0 }))
+      .sort((a, b) => b.n - a.n);
+    // Any item ever referenced by a doctrine fit — used to flag "doctrine"
+    // destroyed modules/ammo the same way hull losses are flagged.
+    const doctrineItemIds = new Set(doctrineTypeIds);
+    const itemLosses = Object.entries(itemLossCount)
+      .map(([id, n]) => ({ id: +id, name: names[id] || `type ${id}`, n, cat: catCache[id]?.[1] ?? null, doctrine: doctrineItemIds.has(+id) ? 1 : 0 }))
       .sort((a, b) => b.n - a.n);
 
     // Whole-market coverage: everything on the XHQ market joins the trade set.
@@ -685,10 +727,11 @@ async function main() {
       system: "XHQ-7V",
       items: tradeItems,
       losses,
+      itemLosses,
       buys: buyList,
       rbuys: rbuyList,
     }));
-    console.log(`Wrote trade.json: ${tradeItems.length} types, ${losses.length} ship loss types (${Object.values(lossCount).reduce((a, b) => a + b, 0)} losses/30d), ${buyList.length} buy-order types.`);
+    console.log(`Wrote trade.json: ${tradeItems.length} types, ${losses.length} ship loss types (${Object.values(lossCount).reduce((a, b) => a + b, 0)} losses/30d), ${itemLosses.length} destroyed item types (${Object.values(itemLossCount).reduce((a, b) => a + b, 0)} units/30d), ${buyList.length} buy-order types.`);
   }
 }
 

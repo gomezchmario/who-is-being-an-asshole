@@ -52,6 +52,11 @@
     .note { font-size: 13px; color: var(--phosphor-dim); line-height: 1.55; }
     .note b { color: var(--amber); }
     .advice li { margin-bottom: 6px; }
+    .subhead {
+      color: var(--amber); font-family: "VT323", monospace; font-size: 17px;
+      letter-spacing: 0.08em; margin: 14px 0 4px;
+    }
+    .subhead:first-of-type { margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -134,6 +139,54 @@
       </div>
     </details>
 
+    <!-- MODULE / AMMO LOSSES -->
+    <details class="doctrine" open>
+      <summary>DOCTRINE MODULES BEING DESTROYED (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
+      <div class="inner">
+        <div class="fgrid" style="margin-bottom:8px">
+          <div class="frow">
+            <span class="flabel dim">VIEW</span>
+            <button id="il-scope" class="fbtn" title="Include every destroyed module/ammo/drone, not just ones used in a tracked doctrine fit — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
+            <button id="il-all" class="fbtn" title="Show everything lost — clears the HIDE thresholds">ALL</button>
+            <span id="il-hint" class="dim" style="font-size:12px"></span>
+          </div>
+          <div class="frow">
+            <span class="flabel dim">HIDE</span>
+            <button id="il-f-lost" class="fbtn on" title="Hide items with fewer losses than this">LOST &lt;</button>
+            <input type="text" id="il-lost-min" value="5" spellcheck="false">
+            <span class="sep dim">│</span>
+            <button id="il-f-stock" class="fbtn on" title="Hide items already stocked for more than this many months">STOCK &gt;</button>
+            <input type="text" id="il-stock-max" value="3" spellcheck="false">
+            <span class="dim">MONTHS</span>
+          </div>
+        </div>
+
+        <div class="subhead">MODULES</div>
+        <div class="tablewrap"><table class="tr-table" id="il-mod-table">
+          <thead><tr>
+            <th class="left">ITEM</th>
+            <th class="num">LOST / 30D</th>
+            <th class="num">XHQ STOCK</th>
+            <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
+          </tr></thead>
+          <tbody id="il-mod-body"></tbody>
+        </table></div>
+
+        <div class="subhead">AMMO + DRONES</div>
+        <div class="tablewrap"><table class="tr-table" id="il-ammo-table">
+          <thead><tr>
+            <th class="left">ITEM</th>
+            <th class="num">LOST / 30D</th>
+            <th class="num">XHQ STOCK</th>
+            <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
+          </tr></thead>
+          <tbody id="il-ammo-body"></tbody>
+        </table></div>
+
+        <p class="note" style="margin-bottom:0">Destroyed and dropped both count — either way someone needs a new one. Red = the Fort holds less than one month of replacements.</p>
+      </div>
+    </details>
+
     <!-- OPPORTUNITIES -->
     <details class="doctrine" open>
       <summary>SUPPLY OPPORTUNITIES — PROFIT AFTER HAULING &amp; TAX</summary>
@@ -191,7 +244,7 @@
     <details class="doctrine" open>
       <summary>BUY ORDER BOUNTIES</summary>
       <div class="inner">
-        <div style="border:1px solid var(--red); color:var(--red); padding:6px 10px; margin-bottom:10px; font-size:12px; letter-spacing:0.06em; text-shadow:0 0 6px rgba(255,59,59,0.4)">⚠ IN DEVELOPMENT — numbers may be wrong. Verify prices in-game before committing ISK.</div>
+        <div style="border:1px solid var(--red); color:var(--red); padding:6px 10px; margin-bottom:10px; font-size:12px; letter-spacing:0.06em; text-shadow:0 0 6px rgba(255,59,59,0.4)">⚠ IN DEVELOPMENT — stuff may be wrong. Verify in-game.</div>
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow" style="padding-top:0">
             <span class="flabel dim">MODE</span>
@@ -451,6 +504,47 @@
       imp: new Set([20]),
     };
 
+    // Destroyed modules/ammo/drones, tallied by fetch-data.mjs from zKillboard
+    // item breakdowns. Same shape and semantics as the ship-loss table above,
+    // split into two mini-tables by category.
+    const ilState = { scope: "doctrine", touched: false };
+    const ilFilters = { hideLost: true, hideStock: true };
+
+    function itemLossRows(cats) {
+      const stockOf = new Map((data.items || []).map((i) => [i.id, i.xhq?.q || 0]));
+      let entries = (data.itemLosses || [])
+        .filter((l) => cats.has(l.cat) && (ilState.scope === "all" || l.doctrine))
+        .map((l) => {
+          const stock = stockOf.get(l.id) || 0;
+          const months = l.n ? stock / l.n : Infinity;
+          return { id: l.id, name: l.name, n: l.n, stock, months };
+        });
+      if (!ilState.touched) return entries.sort((a, b) => b.n - a.n).slice(0, 10);
+      if (ilFilters.hideLost) entries = entries.filter((e) => e.n >= num($("il-lost-min").value, 5));
+      if (ilFilters.hideStock) entries = entries.filter((e) => e.months <= num($("il-stock-max").value, 3));
+      return entries.sort((a, b) => b.n - a.n).slice(0, 200);
+    }
+
+    function itemLossRowHtml(e) {
+      const bad = e.months < 1;
+      return `<tr class="${bad ? "tier3" : ""}">
+        <td class="left">${esc(e.name)}${bad ? ' <span class="demandtag d-miss">RESTOCK</span>' : ""}</td>
+        <td class="num">${e.n.toLocaleString("en-US")}</td>
+        <td class="num">${e.stock.toLocaleString("en-US")}</td>
+        <td class="num">${isFinite(e.months) ? e.months.toFixed(1) : "∞"}</td>
+      </tr>`;
+    }
+
+    function renderItemLosses() {
+      const mods = itemLossRows(CATSETS.mods);
+      const ammo = itemLossRows(CATSETS.ammo);
+      $("il-mod-body").innerHTML = mods.map(itemLossRowHtml).join("")
+        || `<tr><td class="left dim" colspan="4">no ${ilState.scope === "all" ? "" : "doctrine "}module losses recorded yet</td></tr>`;
+      $("il-ammo-body").innerHTML = ammo.map(itemLossRowHtml).join("")
+        || `<tr><td class="left dim" colspan="4">no ${ilState.scope === "all" ? "" : "doctrine "}ammo/drone losses recorded yet</td></tr>`;
+      $("il-hint").textContent = ilState.touched ? "" : "— TOP 10 BY LOSSES EACH · touch a filter for the full board";
+    }
+
     function passes(it) {
       if (!oppState.whole && !(it.fits || it.ind || it.lost)) return false;
       if (filter.q && !it.name.toLowerCase().includes(filter.q)) return false;
@@ -624,6 +718,7 @@
     function renderAll() {
       if (!data) return;
       renderLosses();
+      renderItemLosses();
       renderOpps();
       renderBuys();
       renderMfg();
@@ -675,6 +770,26 @@
     $("lost-min").addEventListener("input", () => { lossTouch(); renderLosses(); });
     $("f-stock").addEventListener("click", () => { lossTouch(); lossFilters.hideStock = !lossFilters.hideStock; $("f-stock").classList.toggle("on", lossFilters.hideStock); syncLossAll(); renderLosses(); });
     $("stock-max").addEventListener("input", () => { lossTouch(); renderLosses(); });
+    const ilTouch = () => { ilState.touched = true; };
+    const syncIlAll = () => $("il-all").classList.toggle("on", !ilFilters.hideLost && !ilFilters.hideStock && ilState.touched);
+    $("il-scope").addEventListener("click", () => {
+      ilState.scope = ilState.scope === "all" ? "doctrine" : "all";
+      $("il-scope").classList.toggle("on", ilState.scope === "all");
+      renderItemLosses();
+    });
+    $("il-all").addEventListener("click", () => {
+      ilTouch();
+      ilFilters.hideLost = false;
+      ilFilters.hideStock = false;
+      $("il-f-lost").classList.remove("on");
+      $("il-f-stock").classList.remove("on");
+      syncIlAll();
+      renderItemLosses();
+    });
+    $("il-f-lost").addEventListener("click", () => { ilTouch(); ilFilters.hideLost = !ilFilters.hideLost; $("il-f-lost").classList.toggle("on", ilFilters.hideLost); syncIlAll(); renderItemLosses(); });
+    $("il-lost-min").addEventListener("input", () => { ilTouch(); renderItemLosses(); });
+    $("il-f-stock").addEventListener("click", () => { ilTouch(); ilFilters.hideStock = !ilFilters.hideStock; $("il-f-stock").classList.toggle("on", ilFilters.hideStock); syncIlAll(); renderItemLosses(); });
+    $("il-stock-max").addEventListener("input", () => { ilTouch(); renderItemLosses(); });
     $("opp-scope").addEventListener("click", () => {
       oppTouch();
       oppState.whole = !oppState.whole;
