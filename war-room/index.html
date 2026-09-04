@@ -437,7 +437,7 @@
           conByHull.get(c.hull_id).push(c);
         }
         for (const list of conByHull.values()) list.sort((a, b) => a.price - b.price);
-        for (const l of trade?.losses || []) lossOf.set(l.id, l.n);
+        for (const l of trade?.losses || []) lossOf.set(l.id, l.n45);
         return readiness;
       })
       .then(render)

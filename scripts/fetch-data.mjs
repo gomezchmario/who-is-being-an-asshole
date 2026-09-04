@@ -599,9 +599,13 @@ async function main() {
       const raw = JSON.parse(readFileSync(zkFile, "utf8"));
       if (raw.v === ZK_CACHE_VERSION) zk = raw.kills || {};
     } catch {}
-    const LOSS_WINDOW_DAYS = 45;
-    const cutoff = Date.now() - LOSS_WINDOW_DAYS * 86400e3;
-    const hardCutoff = Date.now() - (LOSS_WINDOW_DAYS + 5) * 86400e3;
+    // The trade room lets visitors switch the loss window client-side
+    // between any of these — so every count below is precomputed for all
+    // four rather than picking just one.
+    const LOSS_WINDOWS = [45, 30, 15, 6];
+    const MAX_LOSS_WINDOW = Math.max(...LOSS_WINDOWS);
+    const cutoff = Date.now() - MAX_LOSS_WINDOW * 86400e3;
+    const hardCutoff = Date.now() - (MAX_LOSS_WINDOW + 5) * 86400e3;
     // How many pages (200 killmails each) it takes to reach hardCutoff
     // varies a lot by alliance activity — CVAA alone needs ~25 pages to
     // reach 50 days back, so this needs real headroom, not just enough
@@ -642,21 +646,31 @@ async function main() {
       if (new Date(rec.d).getTime() < hardCutoff) delete zk[id];
     }
     writeFileSync(zkFile, JSON.stringify({ v: ZK_CACHE_VERSION, kills: zk }));
-    const lossCount = {};
-    const itemLossCount = {};
+    // Per-window ship and item loss counts: {45: {typeId: n}, 30: {...}, ...}
+    const lossCounts = Object.fromEntries(LOSS_WINDOWS.map((w) => [w, {}]));
+    const itemLossCounts = Object.fromEntries(LOSS_WINDOWS.map((w) => [w, {}]));
     for (const rec of Object.values(zk)) {
-      if (new Date(rec.d).getTime() < cutoff) continue;
-      lossCount[rec.s] = (lossCount[rec.s] || 0) + 1;
-      for (const [tid, qty] of rec.items || []) itemLossCount[tid] = (itemLossCount[tid] || 0) + qty;
+      const t = new Date(rec.d).getTime();
+      for (const w of LOSS_WINDOWS) {
+        if (t < Date.now() - w * 86400e3) continue;
+        lossCounts[w][rec.s] = (lossCounts[w][rec.s] || 0) + 1;
+        for (const [tid, qty] of rec.items || []) itemLossCounts[w][tid] = (itemLossCounts[w][tid] || 0) + qty;
+      }
     }
     // Ship hulls were already categorized in the main type pass; destroyed
-    // items (any module/ammo/drone, doctrine or not) usually weren't.
-    const newItemCats = await categorizeTypes(Object.keys(itemLossCount).map(Number));
+    // items (any module/ammo/drone, doctrine or not) usually weren't. The
+    // widest window's set is a superset of every narrower window's ids —
+    // recomputed after the category filter below drops non-tracked ones.
+    const newItemCats = await categorizeTypes(Object.keys(itemLossCounts[MAX_LOSS_WINDOW]).map(Number));
     if (newItemCats) console.log(`Categorized ${newItemCats} destroyed-item types.`);
-    for (const tid of Object.keys(itemLossCount)) {
-      if (!ITEM_LOSS_CATS.has(catCache[tid]?.[1])) delete itemLossCount[tid];
+    for (const w of LOSS_WINDOWS) {
+      for (const tid of Object.keys(itemLossCounts[w])) {
+        if (!ITEM_LOSS_CATS.has(catCache[tid]?.[1])) delete itemLossCounts[w][tid];
+      }
     }
-    const unknownNameIds = [...new Set([...Object.keys(lossCount), ...Object.keys(itemLossCount)])]
+    const allItemIds = Object.keys(itemLossCounts[MAX_LOSS_WINDOW]);
+    const allShipIds = Object.keys(lossCounts[MAX_LOSS_WINDOW]);
+    const unknownNameIds = [...new Set([...allShipIds, ...allItemIds])]
       .map(Number).filter((id) => !names[id]);
     for (let i = 0; i < unknownNameIds.length; i += 900) {
       const chunk = unknownNameIds.slice(i, i + 900);
@@ -667,15 +681,18 @@ async function main() {
       });
       for (const n of res.json || []) names[n.id] = n.name;
     }
-    const losses = Object.entries(lossCount)
-      .map(([id, n]) => ({ id: +id, name: names[id] || `type ${id}`, n, cat: catCache[id]?.[1] ?? null, doctrine: doctrineShips.has(+id) ? 1 : 0 }))
-      .sort((a, b) => b.n - a.n);
+    // n45/n30/n15/n6 — the trade room switches between these client-side
+    // with no re-scan needed.
+    const nFields = (counts, id) => Object.fromEntries(LOSS_WINDOWS.map((w) => [`n${w}`, counts[w][id] || 0]));
+    const losses = allShipIds
+      .map((id) => ({ id: +id, name: names[id] || `type ${id}`, ...nFields(lossCounts, id), cat: catCache[id]?.[1] ?? null, doctrine: doctrineShips.has(+id) ? 1 : 0 }))
+      .sort((a, b) => b.n45 - a.n45);
     // Any item ever referenced by a doctrine fit — used to flag "doctrine"
     // destroyed modules/ammo the same way hull losses are flagged.
     const doctrineItemIds = new Set(doctrineTypeIds);
-    const itemLosses = Object.entries(itemLossCount)
-      .map(([id, n]) => ({ id: +id, name: names[id] || `type ${id}`, n, cat: catCache[id]?.[1] ?? null, doctrine: doctrineItemIds.has(+id) ? 1 : 0 }))
-      .sort((a, b) => b.n - a.n);
+    const itemLosses = allItemIds
+      .map((id) => ({ id: +id, name: names[id] || `type ${id}`, ...nFields(itemLossCounts, id), cat: catCache[id]?.[1] ?? null, doctrine: doctrineItemIds.has(+id) ? 1 : 0 }))
+      .sort((a, b) => b.n45 - a.n45);
 
     // Whole-market coverage: everything on the XHQ market joins the trade set.
     const marketTypeIds = [...new Set(sells.map((o) => o.type_id))];
@@ -726,7 +743,7 @@ async function main() {
         fits: usedTypes.get(tid) || 0,
         mov: hist2.vols[tid] ?? 0,
         ...(industryIds.includes(tid) && { ind: 1 }),
-        ...(lossCount[tid] && { lost: lossCount[tid] }),
+        ...(lossCounts[45][tid] && { lost: lossCounts[45][tid] }),
       };
     });
     const buyList = Object.entries(bestBuy)
@@ -744,7 +761,7 @@ async function main() {
       buys: buyList,
       rbuys: rbuyList,
     }));
-    console.log(`Wrote trade.json: ${tradeItems.length} types, ${losses.length} ship loss types (${Object.values(lossCount).reduce((a, b) => a + b, 0)} losses/${LOSS_WINDOW_DAYS}d), ${itemLosses.length} destroyed item types (${Object.values(itemLossCount).reduce((a, b) => a + b, 0)} units/${LOSS_WINDOW_DAYS}d), ${buyList.length} buy-order types.`);
+    console.log(`Wrote trade.json: ${tradeItems.length} types, ${losses.length} ship loss types (${Object.values(lossCounts[45]).reduce((a, b) => a + b, 0)} losses/45d), ${itemLosses.length} destroyed item types (${Object.values(itemLossCounts[45]).reduce((a, b) => a + b, 0)} units/45d), ${buyList.length} buy-order types.`);
   }
 }
 

@@ -73,6 +73,13 @@
     <section class="panel">
       <div class="row spread wrap">
         <span id="scan-info" class="dim">ESTABLISHING UPLINK<span class="blink">…</span></span>
+        <span class="controls">
+          <span class="dim" style="font-size:12px">LOSS WINDOW</span>
+          <button class="fbtn winbtn on" data-days="45" title="Track ship/module/ammo/implant losses over the last 45 days">45D</button>
+          <button class="fbtn winbtn" data-days="30" title="Track ship/module/ammo/implant losses over the last 30 days">30D</button>
+          <button class="fbtn winbtn" data-days="15" title="Track ship/module/ammo/implant losses over the last 15 days">15D</button>
+          <button class="fbtn winbtn" data-days="6" title="Track ship/module/ammo/implant losses over the last 6 days">6D</button>
+        </span>
       </div>
     </section>
 
@@ -109,7 +116,7 @@
 
     <!-- LOSSES -->
     <details class="doctrine" open>
-      <summary>DOCTRINE SHIPS DYING (LAST 45 DAYS) — REPLACEMENT DEMAND</summary>
+      <summary>DOCTRINE SHIPS DYING (LAST <span class="win-label">45</span> DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
@@ -132,7 +139,7 @@
         <div class="tablewrap"><table class="tr-table" id="loss-table">
           <thead><tr>
             <th class="left sortable">SHIP<span class="arrow"></span></th>
-            <th class="num sortable">LOST / 45D<span class="arrow"></span></th>
+            <th class="num sortable">LOST / <span class="win-label">45</span>D<span class="arrow"></span></th>
             <th class="num sortable">XHQ HULLS<span class="arrow"></span></th>
             <th class="num sortable">CONTRACTS<span class="arrow"></span></th>
             <th class="num sortable" title="(market hulls + contracts) / losses per month">MONTHS OF STOCK<span class="arrow"></span></th>
@@ -145,7 +152,7 @@
 
     <!-- MODULE LOSSES -->
     <details class="doctrine" open>
-      <summary>DOCTRINE MODULES BEING DESTROYED (LAST 45 DAYS) — REPLACEMENT DEMAND</summary>
+      <summary>DOCTRINE MODULES BEING DESTROYED (LAST <span class="win-label">45</span> DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
@@ -169,7 +176,7 @@
         <div class="tablewrap"><table class="tr-table" id="il-mod-table">
           <thead><tr>
             <th class="left">ITEM</th>
-            <th class="num">LOST / 45D</th>
+            <th class="num">LOST / <span class="win-label">45</span>D</th>
             <th class="num">XHQ STOCK</th>
             <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
           </tr></thead>
@@ -182,7 +189,7 @@
 
     <!-- AMMO / DRONE LOSSES -->
     <details class="doctrine">
-      <summary>AMMO + DRONES BEING DESTROYED (LAST 45 DAYS) — REPLACEMENT DEMAND</summary>
+      <summary>AMMO + DRONES BEING DESTROYED (LAST <span class="win-label">45</span> DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
@@ -207,7 +214,7 @@
         <div class="tablewrap"><table class="tr-table" id="il-ammo-table">
           <thead><tr>
             <th class="left">ITEM</th>
-            <th class="num">LOST / 45D</th>
+            <th class="num">LOST / <span class="win-label">45</span>D</th>
             <th class="num">XHQ STOCK</th>
             <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
           </tr></thead>
@@ -220,7 +227,7 @@
 
     <!-- IMPLANT LOSSES -->
     <details class="doctrine">
-      <summary>IMPLANTS &amp; DRUGS BEING DESTROYED (LAST 45 DAYS) — REPLACEMENT DEMAND</summary>
+      <summary>IMPLANTS &amp; DRUGS BEING DESTROYED (LAST <span class="win-label">45</span> DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
@@ -247,7 +254,7 @@
         <div class="tablewrap"><table class="tr-table" id="il-imp-table">
           <thead><tr>
             <th class="left">ITEM</th>
-            <th class="num">LOST / 45D</th>
+            <th class="num">LOST / <span class="win-label">45</span>D</th>
             <th class="num">XHQ STOCK</th>
             <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
           </tr></thead>
@@ -546,8 +553,9 @@
       const entries = (data.losses || []).filter((l) => l.doctrine).map((l) => {
         const hulls = stockOf.get(l.id) || 0;
         const cons = conByHull.get(l.id) || 0;
-        const months = l.n ? (hulls + cons) / monthlyRate(l.n) : Infinity;
-        return { id: l.id, name: l.name, n: l.n, hulls, cons, months };
+        const n = nOf(l);
+        const months = n ? (hulls + cons) / monthlyRate(n) : Infinity;
+        return { id: l.id, name: l.name, n, hulls, cons, months };
       });
 
       const rowHtml = (e) => {
@@ -606,12 +614,13 @@
       });
     }
 
-    // Loss counts come off a rolling 45-day zKillboard window (see
-    // fetch-data.mjs), not a calendar month — this converts a raw count into
-    // a monthly rate so "months of stock" stays a real calendar month
-    // regardless of how wide that tracking window is.
-    const LOSS_WINDOW_DAYS = 45;
-    const monthlyRate = (n) => n * (30 / LOSS_WINDOW_DAYS);
+    // Loss counts come off a rolling zKillboard window (see fetch-data.mjs,
+    // which precomputes n45/n30/n15/n6 for each), not a calendar month —
+    // this converts a raw count into a monthly rate so "months of stock"
+    // stays a real calendar month no matter which window is selected.
+    let lossWindow = 45;
+    const nOf = (l) => l[`n${lossWindow}`] || 0;
+    const monthlyRate = (n) => n * (30 / lossWindow);
 
     const CATSETS = {
       ammo: new Set([8, 18, 87]),
@@ -668,8 +677,9 @@
         .filter((l) => cats.has(l.cat) && (state.scope === "all" || l.doctrine) && extra(l))
         .map((l) => {
           const stock = stockOf.get(l.id) || 0;
-          const months = l.n ? stock / monthlyRate(l.n) : Infinity;
-          return { id: l.id, name: l.name, n: l.n, cat: l.cat, stock, months };
+          const n = nOf(l);
+          const months = n ? stock / monthlyRate(n) : Infinity;
+          return { id: l.id, name: l.name, n, cat: l.cat, stock, months };
         });
       if (!state.touched) return entries.sort((a, b) => b.n - a.n).slice(0, 10);
       if (state.hideLost) entries = entries.filter((e) => e.n >= num($(prefix + "-lost-min").value, 100));
@@ -933,8 +943,8 @@
       renderOpps();
       renderBuys();
       renderMfg();
-      const totalLost = (data.losses || []).filter((l) => l.doctrine).reduce((s, l) => s + l.n, 0);
-      $("scan-info").innerHTML = `LAST SCAN: <b>${age(data.generated)}</b> · SYSTEM: <b>${esc(data.system)}</b> · ${data.items.length} tracked types · ${totalLost} doctrine hulls lost in 45d`;
+      const totalLost = (data.losses || []).filter((l) => l.doctrine).reduce((s, l) => s + nOf(l), 0);
+      $("scan-info").innerHTML = `LAST SCAN: <b>${age(data.generated)}</b> · SYSTEM: <b>${esc(data.system)}</b> · ${data.items.length} tracked types · ${totalLost} doctrine hulls lost in ${lossWindow}d`;
     }
 
     Promise.all([
@@ -1024,6 +1034,14 @@
     wireLossSection("il", modState, renderModuleLosses);
     wireLossSection("ila", ammoState, renderAmmoTable);
     wireLossSection("ilp", impState, renderImpTable);
+    for (const b of document.querySelectorAll(".winbtn")) {
+      b.addEventListener("click", () => {
+        lossWindow = Number(b.dataset.days);
+        for (const x of document.querySelectorAll(".winbtn")) x.classList.toggle("on", x === b);
+        for (const el of document.querySelectorAll(".win-label")) el.textContent = lossWindow;
+        renderAll();
+      });
+    }
     $("il-ammo-mode").addEventListener("click", () => {
       ilAmmoState.grouped = !ilAmmoState.grouped;
       $("il-ammo-mode").classList.toggle("on", ilAmmoState.grouped);
