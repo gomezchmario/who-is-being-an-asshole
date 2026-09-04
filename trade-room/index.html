@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../style.css?v=28">
+  <link rel="stylesheet" href="../style.css?v=29">
   <style>
     details.doctrine { border: 1px solid var(--border); background: var(--panel); margin-bottom: 10px; }
     details.doctrine > summary {
@@ -145,6 +145,7 @@
             <span class="sep dim">│</span>
             <button id="opp-scope" class="fbtn" title="Include every type sold on the XHQ market, not just doctrine and industry items">WHOLE MARKET</button>
             <button id="opp-src" class="fbtn" title="Which hub you buy from — affects cost, profit and the unstocked sell price">BUY: JITA</button>
+            <button id="opp-nohaul" class="fbtn" title="Treat hauling as free — e.g. filling orders with stock you already have on site, or topping off a haul you were making anyway">IGNORE HAULING</button>
             <span id="opp-hint" class="dim" style="font-size:12px"></span>
           </div>
           <div class="frow">
@@ -300,7 +301,7 @@
     let data = null, contracts = null;
     let isoJita = null; // Helium Isotopes Jita price, from trade data
     const filter = { f: "all", q: "" };
-    const oppState = { whole: false, src: "jita", touched: false, hideProfit: true, hideMoves: true };
+    const oppState = { whole: false, src: "jita", noHaul: false, touched: false, hideProfit: true, hideMoves: true };
     const lossFilters = { touched: false, hideLost: true, hideStock: true };
 
     // --- cost model, persisted per browser ---
@@ -474,7 +475,7 @@
         .map((it) => {
           const buy = oppState.src === "amarr" ? (it.amarr ?? it.jita) : it.jita;
           const sell = it.xhq ? it.xhq.min * 0.999 : buy * (1 + m.margin);
-          const haul = it.vol * m.haul;
+          const haul = oppState.noHaul ? 0 : it.vol * m.haul;
           const profit = sell * (1 - m.fees) - buy - haul;
           const pm3 = profit / it.vol;
           const roi = profit / (it.jita + haul);
@@ -686,6 +687,12 @@
       $("opp-src").textContent = "BUY: " + oppState.src.toUpperCase();
       renderOpps();
     });
+    $("opp-nohaul").addEventListener("click", () => {
+      oppTouch();
+      oppState.noHaul = !oppState.noHaul;
+      $("opp-nohaul").classList.toggle("on", oppState.noHaul);
+      renderOpps();
+    });
     $("q").addEventListener("input", () => { oppTouch(); filter.q = $("q").value.trim().toLowerCase(); renderOpps(); });
     attachSort($("opp-table"));
     attachSort($("buy-table"));
@@ -745,6 +752,6 @@
   })();
   </script>
   <script data-goatcounter="https://xhq.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
-  <script src="../settings.js?v=28"></script>
+  <script src="../settings.js?v=29"></script>
 </body>
 </html>
