@@ -181,7 +181,8 @@
     if (offenders === 0) {
       summary.innerHTML = `<span class="ok">NOBODY IS BEING AN ASSHOLE.</span> <span class="dim">(${judged} orders judged — a miracle in New Eden)</span>`;
     } else {
-      summary.innerHTML = `<span class="count">${offenders}</span> OF ${judged} SELL ORDERS ARE (&ge;${Math.round(threshold * 100)}%) OVER JITA`;
+      const refLabel = filters.cat === "caps" ? "JITA / GALACTIC AVG" : "JITA";
+      summary.innerHTML = `<span class="count">${offenders}</span> OF ${judged} SELL ORDERS ARE (&ge;${Math.round(threshold * 100)}%) OVER ${refLabel}`;
     }
 
     $("scan-info").innerHTML =
