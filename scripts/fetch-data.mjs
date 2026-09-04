@@ -583,9 +583,10 @@ async function main() {
     //    victim's fitted/cargo item breakdown, so destroyed modules and
     //    ammo/drones can be tallied the same way as hull losses.
     const ALLIANCES = { 1988009451: "CVA", 99010240: "CVAA" };
-    // Module, Charge, Drone, Subsystem — drones count alongside ammo, not
-    // modules, since they're consumed the same way.
-    const ITEM_LOSS_CATS = new Set([7, 8, 18, 32]);
+    // Module, Charge, Drone, Implant/Booster, Subsystem — drones count
+    // alongside ammo, not modules; implants only come off a killmail when
+    // the pod itself was destroyed.
+    const ITEM_LOSS_CATS = new Set([7, 8, 18, 20, 32]);
     // v1 cache entries were plain [shipTypeId, dateStr] tuples with no item
     // breakdown. Bumping this discards any cache below it once, forcing a
     // full re-fetch so every killmail in the window gets real item data
