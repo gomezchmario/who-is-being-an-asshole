@@ -215,6 +215,43 @@
       </div>
     </details>
 
+    <!-- IMPLANT LOSSES -->
+    <details class="doctrine">
+      <summary>IMPLANTS BEING DESTROYED (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
+      <div class="inner">
+        <div class="fgrid" style="margin-bottom:8px">
+          <div class="frow">
+            <span class="flabel dim">VIEW</span>
+            <button id="ilp-scope" class="fbtn" title="Include every destroyed implant, not just ones used in a tracked doctrine set/hardwiring — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
+            <button id="ilp-all" class="fbtn" title="Show everything lost — clears the HIDE thresholds">CLEAR FILTERS</button>
+            <button id="ilp-mode" class="fbtn" title="Group by implant set (grade + slot), like the war room's missing-implants list">GROUP BY SET</button>
+            <span id="ilp-hint" class="dim" style="font-size:12px"></span>
+          </div>
+          <div class="frow">
+            <span class="flabel dim">HIDE</span>
+            <button id="ilp-f-lost" class="fbtn on" title="Hide items with fewer losses than this">LOST &lt;</button>
+            <input type="text" id="ilp-lost-min" value="8" spellcheck="false">
+            <span class="sep dim">│</span>
+            <button id="ilp-f-stock" class="fbtn on" title="Hide items already stocked for more than this many months">STOCK &gt;</button>
+            <input type="text" id="ilp-stock-max" value="2" spellcheck="false">
+            <span class="dim">MONTHS</span>
+          </div>
+        </div>
+
+        <div class="tablewrap"><table class="tr-table" id="il-imp-table">
+          <thead><tr>
+            <th class="left">ITEM</th>
+            <th class="num">LOST / 30D</th>
+            <th class="num">XHQ STOCK</th>
+            <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
+          </tr></thead>
+          <tbody id="il-imp-body"></tbody>
+        </table></div>
+
+        <p class="note" style="margin-bottom:0">Implants only come off a killmail when the pod itself is destroyed — destroyed and dropped both count. Red = the Fort holds less than one month of replacements.</p>
+      </div>
+    </details>
+
     <!-- OPPORTUNITIES -->
     <details class="doctrine" open>
       <summary>SUPPLY OPPORTUNITIES — PROFIT AFTER HAULING &amp; TAX</summary>
@@ -559,7 +596,9 @@
     // shape and filter semantics as the ship-loss table above.
     const modState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true };
     const ammoState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true };
+    const impState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true };
     const ilAmmoState = { grouped: false };
+    const ilImpState = { grouped: false };
 
     // Same family/size grouping as the war room's missing-ammo list, so
     // destroyed ammo reads the same way as unstocked ammo does there.
@@ -581,6 +620,18 @@
       return 0;
     };
     const AMMO_GROUP_ORDER = [...AMMO_FAMILIES.map(([k]) => k).slice(0, -1), "DRONES", "PROBES & MISC"];
+
+    // Same set/hardwiring/drug grouping as the war room's missing-implants
+    // list: "Mid-grade Amulet Gamma" -> set "Mid-grade Amulet", slot "Gamma".
+    const IMPLANT_SLOT_ORDER = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Omega", "CA-1", "CA-2", "CA-3", "CA-4"];
+    const isDrugName = (n) => /Booster$|\sDose\s/.test(n);
+    function implantGroupOf(name) {
+      const sm = name.match(/^((?:Low|Mid|High)-grade [A-Za-z]+) (Alpha|Beta|Gamma|Delta|Epsilon|Omega)$/) ||
+                 name.match(/^(Genolution Core Augmentation) (CA-\d)$/);
+      if (sm) return { key: sm[1], slot: sm[2] };
+      if (isDrugName(name)) return { key: "DRUGS", slot: null };
+      return { key: "HARDWIRINGS", slot: null };
+    }
 
     function lossRows(cats, prefix, state) {
       const stockOf = new Map((data.items || []).map((i) => [i.id, i.xhq?.q || 0]));
@@ -636,9 +687,37 @@
       $("ila-hint").textContent = ammoState.touched ? "" : "— TOP 10 BY LOSSES · touch a filter for the full board";
     }
 
+    function renderImpTable() {
+      const entries = lossRows(CATSETS.imp, "ilp", impState);
+      const emptyRow = `<tr><td class="left dim" colspan="4">no ${impState.scope === "all" ? "" : "doctrine "}implant losses recorded yet</td></tr>`;
+      if (!ilImpState.grouped) {
+        $("il-imp-body").innerHTML = entries.map(itemLossRowHtml).join("") || emptyRow;
+      } else {
+        const groups = new Map();
+        for (const e of entries) {
+          const { key, slot } = implantGroupOf(e.name);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push({ ...e, slot });
+        }
+        const setKeys = [...groups.keys()]
+          .filter((k) => k !== "HARDWIRINGS" && k !== "DRUGS")
+          .sort((a, b) => groups.get(b).reduce((s, e) => s + e.n, 0) - groups.get(a).reduce((s, e) => s + e.n, 0));
+        const order = [...setKeys, ...["HARDWIRINGS", "DRUGS"].filter((k) => groups.has(k))];
+        $("il-imp-body").innerHTML = order.map((k) => {
+          const items = groups.get(k).sort((a, b) => a.slot && b.slot
+            ? IMPLANT_SLOT_ORDER.indexOf(a.slot) - IMPLANT_SLOT_ORDER.indexOf(b.slot)
+            : b.n - a.n);
+          return `<tr><td colspan="4" class="left" style="color:var(--amber);letter-spacing:0.1em;padding-top:10px">▸ ${esc(k)}</td></tr>` +
+            items.map(itemLossRowHtml).join("");
+        }).join("") || emptyRow;
+      }
+      $("ilp-hint").textContent = impState.touched ? "" : "— TOP 10 BY LOSSES · touch a filter for the full board";
+    }
+
     function renderItemLosses() {
       renderModuleLosses();
       renderAmmoTable();
+      renderImpTable();
     }
 
     function passes(it) {
@@ -911,10 +990,16 @@
     }
     wireLossSection("il", modState, renderModuleLosses);
     wireLossSection("ila", ammoState, renderAmmoTable);
+    wireLossSection("ilp", impState, renderImpTable);
     $("il-ammo-mode").addEventListener("click", () => {
       ilAmmoState.grouped = !ilAmmoState.grouped;
       $("il-ammo-mode").classList.toggle("on", ilAmmoState.grouped);
       renderAmmoTable();
+    });
+    $("ilp-mode").addEventListener("click", () => {
+      ilImpState.grouped = !ilImpState.grouped;
+      $("ilp-mode").classList.toggle("on", ilImpState.grouped);
+      renderImpTable();
     });
     $("opp-scope").addEventListener("click", () => {
       oppTouch();
