@@ -183,9 +183,14 @@
           : `<div class="fitline" style="color:var(--amber)">◑ all items on market, but not enough stock for one complete fit</div>`;
       }
       if (impItems.length) {
+        // Same math as the fit kits: how many complete implant sets the
+        // market stock covers.
+        const impSets = Math.min(...impItems.map((it) => Math.floor((it.mkt?.q || 0) / it.qty)));
         miss += missImp.length
           ? `<div class="missline">IMPLANTS NOT AVAILABLE: ${missImp.map((m) => esc(m.name)).join(", ")}</div>`
-          : `<div class="fitline ok-inline">✓ implants available</div>`;
+          : (impSets >= 1
+            ? `<div class="fitline ok-inline">✓ implants available — stock for <b>${impSets}</b> complete set${impSets > 1 ? "s" : ""}</div>`
+            : `<div class="fitline" style="color:var(--amber)">◑ all implants on market, but not enough stock for one complete set</div>`);
       }
       const rows = f.items.map((it) => `
         <tr>
