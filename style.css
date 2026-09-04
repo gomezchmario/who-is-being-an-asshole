@@ -391,13 +391,14 @@ tbody td {
 tbody tr:hover { background: rgba(51, 255, 102, 0.06); }
 
 .verdict { white-space: nowrap; letter-spacing: 0.05em; }
-.v0 { color: var(--phosphor-dim); }              /* honest */
+.v0 { color: var(--phosphor); }                  /* honest */
 .v1 { color: var(--amber); }                     /* cheeky */
 .v2 { color: #ffd75e; }                          /* jerk */
 .v3 { color: #ff7a29; }                          /* dick */
 .v4 { color: var(--red); font-weight: bold; }    /* asshole */
 .v5 { color: var(--red); font-weight: bold; }    /* galactic asshole */
 .v6 { color: #6be7ff; }                          /* saint */
+.v7 { color: #7dffb0; }                          /* supporter */
 .v4 .verdict, tr.tier4 td.markup { text-shadow: 0 0 8px rgba(255, 59, 59, 0.7); }
 .v5 .verdict, tr.tier5 td.markup {
   text-shadow: 0 0 12px rgba(255, 59, 59, 0.9);
@@ -411,7 +412,8 @@ tr.tier2 td.markup { color: #ffd75e; }
 tr.tier3 td.markup { color: #ff7a29; }
 tr.tier4 td.markup, tr.tier5 td.markup { color: var(--red); }
 tr.tier6 td.markup { color: #6be7ff; }
-tr.tier0 td { color: var(--phosphor-dim); }
+tr.tier7 td.markup { color: #7dffb0; }
+tr.tier0 td.markup { color: var(--phosphor); }
 
 .struct { color: var(--phosphor-faint); font-size: 12px; display: block; }
 td .itemname { color: inherit; text-decoration: none; }

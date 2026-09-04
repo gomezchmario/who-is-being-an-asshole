@@ -16,7 +16,8 @@
     { min: 0.50, label: "▓ JERK", cls: "v2", tier: 2 },
     { min: null, label: "▒ CHEEKY", cls: "v1", tier: 1 },
   ];
-  const SAINT = { label: "★ SAINT", cls: "v6", tier: 6 };
+  const SAINT = { label: "█ SAINT", cls: "v6", tier: 6 };
+  const SUPPORTER = { label: "▒ SUPPORTER", cls: "v7", tier: 7 };
   const HONEST = { label: "░ HONEST", cls: "v0", tier: 0 };
 
   let data = null;
@@ -84,9 +85,11 @@
   }
 
   function verdictFor(markup, threshold) {
-    if (markup <= -0.15) return SAINT;
+    const pct = Math.round(markup * 100);
+    if (pct <= -15) return SAINT;
+    if (pct <= -7) return SUPPORTER;
     for (const cand of VERDICTS) {
-      if (markup >= (cand.min ?? threshold)) return cand;
+      if (pct >= Math.round((cand.min ?? threshold) * 100)) return cand;
     }
     return HONEST;
   }
@@ -147,7 +150,7 @@
       if (o.jita == null || o.markup == null) { noJita++; continue; } // nothing to judge against
       if (!passesFilters(o)) continue;
       judged++;
-      const isOffender = o.markup >= threshold;
+      const isOffender = Math.round(o.markup * 100) >= Math.round(threshold * 100);
       if (isOffender) offenders++;
       if (!isOffender && !showAll) continue;
 
@@ -165,7 +168,7 @@
         <td class="num">${o.volume.toLocaleString("en-US")}</td>
         <td class="num">${fmtIsk(o.price)}</td>
         <td class="num">${fmtIsk(o.jita)}${o.gal ? ' <span class="galtag" title="No Jita sell orders — judged against the galaxy-wide average price">AVG</span>' : ""}</td>
-        <td class="num markup">+${Math.round(o.markup * 100)}%</td>`;
+        <td class="num markup">${o.markup >= 0 ? "+" : ""}${Math.round(o.markup * 100)}%</td>`;
       rows.push(tr);
     }
 
@@ -243,6 +246,8 @@
         { type_id: 31716, name: "Medium Core Defense Field Extender I", price: 3400000, jita: 2900000, volume: 8, location_id: "1035949018593", markup: 0.1724, cat: 7 },
         { type_id: 27361, name: "Caldari Navy Antimatter Charge M", price: 480, jita: 455, volume: 120000, location_id: "1035949018593", markup: 0.0549, cat: 8 },
         { type_id: 12608, name: "Hobgoblin II", price: 690000, jita: 310000, volume: 45, location_id: "1035949018593", markup: 1.2258, cat: 18 },
+        { type_id: 526, name: "Stasis Webifier I", price: 850000, jita: 1000000, volume: 12, location_id: "1035949018593", markup: -0.15, cat: 7 },
+        { type_id: 527, name: "X5 Enduring Stasis Webifier", price: 1800000, jita: 2000000, volume: 6, location_id: "1035949018593", markup: -0.10, cat: 7 },
       ],
     };
   }

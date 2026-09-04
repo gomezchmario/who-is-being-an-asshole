@@ -14,7 +14,8 @@
     { min: 0.50, label: "▓ JERK", cls: "v2", tier: 2 },
     { min: null, label: "▒ CHEEKY", cls: "v1", tier: 1 },
   ];
-  const SAINT = { label: "★ SAINT", cls: "v6", tier: 6 };
+  const SAINT = { label: "█ SAINT", cls: "v6", tier: 6 };
+  const SUPPORTER = { label: "▒ SUPPORTER", cls: "v7", tier: 7 };
   const HONEST = { label: "░ HONEST", cls: "v0", tier: 0 };
 
   let data = null;
@@ -46,9 +47,11 @@
   }
 
   function verdictFor(markup, threshold) {
-    if (markup <= -0.15) return SAINT;
+    const pct = Math.round(markup * 100);
+    if (pct <= -15) return SAINT;
+    if (pct <= -7) return SUPPORTER;
     for (const cand of VERDICTS) {
-      if (markup >= (cand.min ?? threshold)) return cand;
+      if (pct >= Math.round((cand.min ?? threshold) * 100)) return cand;
     }
     return HONEST;
   }
@@ -91,7 +94,7 @@
       if (filters.cat === "scalp" && !c.scalp) continue;
       if (c.markup == null) { unjudged++; continue; }
       judged++;
-      const isOffender = c.markup >= threshold || !!c.scalp;
+      const isOffender = Math.round(c.markup * 100) >= Math.round(threshold * 100) || !!c.scalp;
       if (isOffender) offenders++;
       if (!isOffender && !showAll) continue;
 
