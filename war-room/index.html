@@ -400,7 +400,13 @@
 
       $("doctrines").innerHTML = ordered.map((d, i) => {
         const totalMissing = d.fits.reduce((s, f) => s + f.missing.length, 0);
-        const stats = `${d.fits.length} fits · ` + (totalMissing
+        // Hulls with neither XHQ market stock nor a single contract.
+        const noShip = new Set();
+        for (const f of d.fits) if (!f.hullMkt && !f.hullCon) noShip.add(f.hullName || f.hull);
+        const shipsPart = noShip.size
+          ? `<span style="color:var(--red)">${noShip.size} ship${noShip.size > 1 ? "s" : ""} unavailable</span> · `
+          : "";
+        const stats = `${d.fits.length} fits · ` + shipsPart + (totalMissing
           ? `<span style="color:var(--red)">${totalMissing} items unavailable</span>`
           : `<span class="ok-inline">all buyable in XHQ</span>`);
         return `<details class="doctrine"${i < 3 ? " open" : ""}>
