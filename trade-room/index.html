@@ -87,12 +87,20 @@
     <details class="doctrine" open>
       <summary>LOGISTICS &amp; TAX MODEL</summary>
       <div class="inner">
-        <div class="cost-grid">
+        <div class="row" style="gap:6px;margin-bottom:10px">
+          <span class="dim" style="font-size:12px">HAULER</span>
+          <button id="mode-jf" class="fbtn on" data-mode="jf" title="Ark-class jump freighter — jumps straight in, burns isotopes">JUMP FREIGHTER</button>
+          <button id="mode-freighter" class="fbtn" data-mode="freighter" title="Regular freighter — no isotopes to burn, but it flies the whole route through gates">FREIGHTER</button>
+          <button id="mode-dst" class="fbtn" data-mode="dst" title="Deep Space Transport — small and cheap, no isotopes, flies through gates">DST</button>
+        </div>
+        <div class="cost-grid" id="jf-fields">
           <label>Ark isotopes / LY <input id="p-isoly" type="text" value="4,500"></label>
           <label>route LY (round trip) <input id="p-ly" type="text" value="30"></label>
           <label>isotope price <input id="p-isoprice" type="text" value="auto"></label>
-          <label>other cost / trip <input id="p-flat" type="text" value="20,000,000" title="Freighter leg Jita→staging, courier fees, risk buffer"></label>
-          <label>Ark cargo m³ <input id="p-cap" type="text" value="285,000"></label>
+        </div>
+        <div class="cost-grid" style="margin-top:10px">
+          <label id="flat-label">other cost / trip <input id="p-flat" type="text" value="20,000,000" title="Freighter leg Jita→staging, courier fees, risk buffer"></label>
+          <label>cargo m³ <input id="p-cap" type="text" value="285,000"></label>
         </div>
         <div class="cost-grid" style="margin-top:10px">
           <label>haul rate ISK/m³ <input id="p-haul" type="text" value="auto" title="Override the computed rate, or leave 'auto'"></label>
@@ -359,22 +367,44 @@
 
     // --- cost model, persisted per browser ---
     const PKEYS = ["p-isoly", "p-ly", "p-isoprice", "p-flat", "p-cap", "p-haul", "p-broker", "p-tax", "p-margin"];
+    // Not every haul needs a jump — a Freighter or DST skips isotopes
+    // entirely and just flies the gates, at the cost of smaller cargo.
+    const HAUL_MODES = {
+      jf: { flat: "20,000,000", cap: "285,000" },
+      freighter: { flat: "15,000,000", cap: "1,200,000" },
+      dst: { flat: "8,000,000", cap: "62,500" },
+    };
+    const costState = { mode: "jf" };
     try {
       const saved = JSON.parse(localStorage.getItem("traderoom") || "{}");
       for (const k of PKEYS) if (saved[k] != null) $(k).value = saved[k];
+      if (HAUL_MODES[saved.mode]) costState.mode = saved.mode;
     } catch {}
     function saveParams() {
       try {
-        const o = {};
+        const o = { mode: costState.mode };
         for (const k of PKEYS) o[k] = $(k).value;
         localStorage.setItem("traderoom", JSON.stringify(o));
       } catch {}
     }
+    function applyHaulMode() {
+      for (const b of document.querySelectorAll("[data-mode]")) b.classList.toggle("on", b.dataset.mode === costState.mode);
+      $("jf-fields").style.display = costState.mode === "jf" ? "" : "none";
+      $("flat-label").firstChild.textContent = costState.mode === "jf"
+        ? "other cost / trip "
+        : "other cost / trip (courier fee, time & risk) ";
+    }
+    applyHaulMode();
 
     function model() {
-      const isoPrice = $("p-isoprice").value.trim().toLowerCase() === "auto" ? (isoJita || 900) : num($("p-isoprice").value, 900);
-      const fuel = num($("p-isoly").value, 4500) * num($("p-ly").value, 30) * isoPrice;
-      const tripCost = fuel + num($("p-flat").value, 2e7);
+      let tripCost, isoPrice = 0;
+      if (costState.mode === "jf") {
+        isoPrice = $("p-isoprice").value.trim().toLowerCase() === "auto" ? (isoJita || 900) : num($("p-isoprice").value, 900);
+        const fuel = num($("p-isoly").value, 4500) * num($("p-ly").value, 30) * isoPrice;
+        tripCost = fuel + num($("p-flat").value, 2e7);
+      } else {
+        tripCost = num($("p-flat").value, 1.5e7);
+      }
       const cap = Math.max(1, num($("p-cap").value, 285000));
       const autoHaul = tripCost / cap;
       const haul = $("p-haul").value.trim().toLowerCase() === "auto" ? autoHaul : num($("p-haul").value, autoHaul);
@@ -559,7 +589,10 @@
     function renderOpps() {
       const m = model();
       $("derived").innerHTML =
-        `JUMP TRIP ≈ <b>${isk(m.tripCost)}</b> ISK (iso @ ${isk(m.isoPrice)}) · HAUL RATE ≈ <b>${m.haul.toFixed(0)}</b> ISK/m³` +
+        (costState.mode === "jf"
+          ? `JUMP TRIP ≈ <b>${isk(m.tripCost)}</b> ISK (iso @ ${isk(m.isoPrice)})`
+          : `TRIP COST ≈ <b>${isk(m.tripCost)}</b> ISK (no isotopes)`) +
+        ` · HAUL RATE ≈ <b>${m.haul.toFixed(0)}</b> ISK/m³` +
         ($("p-haul").value.trim().toLowerCase() === "auto" ? "" : ` <span class="dim">(override; auto would be ${m.autoHaul.toFixed(0)})</span>`) +
         ` · FEES ON SALE: <b>${(m.fees * 100).toFixed(2)}%</b>`;
 
@@ -742,6 +775,24 @@
     });
 
     for (const k of PKEYS) $(k).addEventListener("input", () => { saveParams(); renderOpps(); renderBuys(); });
+    for (const b of document.querySelectorAll("[data-mode]")) {
+      b.addEventListener("click", () => {
+        const mode = b.dataset.mode;
+        if (mode === costState.mode) return;
+        const prevDefaults = HAUL_MODES[costState.mode];
+        const next = HAUL_MODES[mode];
+        // Only replace cargo/cost with the new hauler's defaults if the
+        // fields still hold the previous hauler's defaults — a value the
+        // user tuned by hand is left alone.
+        if ($("p-cap").value === prevDefaults.cap) $("p-cap").value = next.cap;
+        if ($("p-flat").value === prevDefaults.flat) $("p-flat").value = next.flat;
+        costState.mode = mode;
+        applyHaulMode();
+        saveParams();
+        renderOpps();
+        renderBuys();
+      });
+    }
     for (const b of document.querySelectorAll(".cbtn")) {
       b.addEventListener("click", () => {
         oppTouch();
