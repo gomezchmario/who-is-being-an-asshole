@@ -323,6 +323,9 @@ async function main() {
       if (doctrineShips.has(tid)) doctrine = 1;
     }
     const swap = items.some((i) => !i[2]);
+    // Abyssal (mutated) modules are unique items with no market price; they
+    // count 0 toward value, so flag the contract — its markup is overstated.
+    const aby = included.some(([tid]) => (names[tid] || "").startsWith("Abyssal"));
     const markup = !swap && value > 0 ? c.price / value - 1 : null;
     const issuerName = names[c.issuer_id] || String(c.issuer_id);
     const scalp = findScalp(c, included, issuerName);
@@ -340,6 +343,7 @@ async function main() {
       ...(doctrine && { doctrine: 1 }),
       ...(unpriced && { est: 1 }),
       ...(swap && { swap: 1 }),
+      ...(aby && { aby: 1 }),
       ...(scalp && { scalp }),
     };
   });

@@ -318,6 +318,15 @@ th.sortable .arrow { color: var(--amber); }
   letter-spacing: 0.06em;
 }
 
+.abytag {
+  color: #c86bff;
+  font-size: 11px;
+  border: 1px solid #c86bff;
+  padding: 0 3px;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 6px rgba(200, 107, 255, 0.5);
+}
+
 .scalptag {
   color: var(--red);
   font-size: 11px;
