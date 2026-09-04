@@ -192,6 +192,9 @@
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow" style="padding-top:0">
+            <span class="flabel dim">SCOPE</span>
+            <button id="buy-scope" class="fbtn" title="Include public buy orders across all of Providence and Catch (richest 500), not just this system">PROVIDENCE + CATCH</button>
+            <span class="sep dim">│</span>
             <span class="flabel dim">COSTS</span>
             <button id="buy-nohaul" class="fbtn on" title="Treat hauling as free — e.g. filling orders with stock you already have on site, or topping off a haul you were making anyway">IGNORE HAULING</button>
           </div>
@@ -212,6 +215,7 @@
             <th class="num sortable">BUY @<span class="arrow"></span></th>
             <th class="num sortable" title="Remaining quantity on the best buy order (total demand across all buy orders in parentheses)">WANTED<span class="arrow"></span></th>
             <th class="left sortable">BEST SOURCE<span class="arrow"></span></th>
+            <th class="left sortable" title="Smallest hauler that fits the whole fill: Blockade Runner ≤10k m³, DST ≤62.5k m³, else Jump Freighter">HAULER<span class="arrow"></span></th>
             <th class="num sortable" title="Source price plus hauling for remote sources">COST/U<span class="arrow"></span></th>
             <th class="num sortable" title="Buy price after sales tax, minus cost">PROFIT/U<span class="arrow"></span></th>
             <th class="num sortable" title="Profit × the best order's remaining quantity">TOTAL<span class="arrow"></span></th>
@@ -506,12 +510,13 @@
     }
 
     // Buy orders across XHQ structures vs the cheapest way to fill them.
-    const buyState = { noHaul: true, hidePm3: false, hideTotal: true };
+    const buyState = { noHaul: true, hidePm3: false, hideTotal: true, regional: false };
     function renderBuys() {
       const m = model();
       const tax = num($("p-tax").value, 4.48) / 100;
       const byId = new Map((data.items || []).map((i) => [i.id, i]));
-      const rows = (data.buys || [])
+      const source = buyState.regional ? data.rbuys : data.buys;
+      const rows = (source || [])
         .map((b) => {
           const it = byId.get(b.id);
           if (!it || it.vol == null) return null;
@@ -533,17 +538,23 @@
         .filter((x) => !buyState.hideTotal || x.total >= num($("buy-total-min").value, 10000000))
         .sort((a, c) => c.total - a.total)
         .slice(0, 50);
+      const haulerBadge = (cargo) => {
+        if (cargo <= 10000) return `<span class="demandtag" style="color:var(--phosphor);border-color:var(--phosphor-dim)" title="${Math.ceil(cargo).toLocaleString("en-US")} m³ — fits a Blockade Runner">BR</span>`;
+        if (cargo <= 62500) return `<span class="demandtag d-low" title="${Math.ceil(cargo).toLocaleString("en-US")} m³ — needs a DST">DST</span>`;
+        return `<span class="demandtag d-lost" title="${Math.ceil(cargo).toLocaleString("en-US")} m³ — Jump Freighter territory">JF</span>`;
+      };
       $("buy-body").innerHTML = rows.map(({ it, b, src, cost, profit, total }) => `
         <tr>
-          <td class="left" data-v="${esc(it.name)}">${esc(it.name)}<span class="struct">${it.vol} m³ · total demand ${b.tq.toLocaleString("en-US")}</span></td>
+          <td class="left" data-v="${esc(it.name)}">${esc(it.name)}<span class="struct">${it.vol} m³ · total demand ${b.tq.toLocaleString("en-US")}${b.sys ? " · deliver: " + esc(b.sys) : ""}</span></td>
           <td class="num" data-v="${b.p}">${isk(b.p)}</td>
           <td class="num" data-v="${b.q}">${b.q.toLocaleString("en-US")}${b.tq > b.q ? ` <span class="dim">(${b.tq.toLocaleString("en-US")})</span>` : ""}</td>
           <td class="left" data-v="${src}">${src === "XHQ" ? '<span class="ok-inline" style="color:var(--phosphor)">XHQ (no haul)</span>' : `<span class="d-low demandtag">${src}</span>`}</td>
+          <td class="left" data-v="${it.vol * b.q}">${haulerBadge(it.vol * b.q)}</td>
           <td class="num" data-v="${cost}">${isk(cost)}</td>
           <td class="num profit-pos" data-v="${profit}">${isk(profit)}</td>
           <td class="num profit-pos" data-v="${total}">${isk(total)}</td>
         </tr>`).join("") ||
-        '<tr><td class="left dim" colspan="7">no profitable buy orders right now — the fort\'s buyers are stingy</td></tr>';
+        '<tr><td class="left dim" colspan="8">no buy orders clear your thresholds — loosen the HIDE filters, widen the scope, or the buyers are stingy today</td></tr>';
     }
 
     function renderMfg() {
@@ -643,6 +654,11 @@
     $("q").addEventListener("input", () => { oppTouch(); filter.q = $("q").value.trim().toLowerCase(); renderOpps(); });
     attachSort($("opp-table"));
     attachSort($("buy-table"));
+    $("buy-scope").addEventListener("click", () => {
+      buyState.regional = !buyState.regional;
+      $("buy-scope").classList.toggle("on", buyState.regional);
+      renderBuys();
+    });
     $("buy-nohaul").addEventListener("click", () => {
       buyState.noHaul = !buyState.noHaul;
       $("buy-nohaul").classList.toggle("on", buyState.noHaul);

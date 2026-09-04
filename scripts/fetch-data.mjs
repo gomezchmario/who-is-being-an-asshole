@@ -121,6 +121,29 @@ async function main() {
   console.log(`Structures: ${JSON.stringify(structures)}`);
   console.log(`Sell orders found: ${sells.length}; buy orders: ${buys.length} (${Object.keys(bestBuy).length} types)`);
 
+  // 2a2. Regional buy orders (public feeds, Providence + Catch) for the
+  //      trade room's expanded bounty scope. Best order per type, kept when
+  //      the order is worth at least 1M, capped to the 500 richest.
+  const CATCH_ID = 10000014;
+  const bestRBuy = {};
+  for (const rid of [REGION_ID, CATCH_ID]) {
+    const feed = await fetchPaginated(`${ESI}/markets/${rid}/orders/`);
+    for (const o of feed.items) {
+      if (!o.is_buy_order) continue;
+      const b = bestRBuy[o.type_id];
+      if (!b || o.price > b.p) bestRBuy[o.type_id] = { p: o.price, q: o.volume_remain, tq: (b?.tq || 0) + o.volume_remain, sys: o.system_id };
+      else b.tq += o.volume_remain;
+    }
+  }
+  const rbuyEntries = Object.entries(bestRBuy)
+    .map(([tid, b]) => [Number(tid), b])
+    .filter(([, b]) => b.p * b.q >= 1_000_000)
+    .sort((a, z) => z[1].p * z[1].q - a[1].p * a[1].q)
+    .slice(0, 500);
+  const rbuyTypeIds = rbuyEntries.map(([tid]) => tid);
+  const rbuySystemIds = [...new Set(rbuyEntries.map(([, b]) => b.sys))];
+  console.log(`Regional buys (Prov+Catch): ${rbuyEntries.length} types kept.`);
+
   // 2b. Outstanding public contracts starting at our structures. Contract
   //     contents are immutable, so they're cached in contract-items.json and
   //     only new contract ids are fetched each run.
@@ -190,7 +213,7 @@ async function main() {
   //    back to the 5-day median sell when Jita is momentarily out of stock).
   const contractTypeIds = Object.values(itemsCache).flatMap((items) => items.map((i) => i[0]));
   const buyTypeIds = Object.keys(bestBuy).map(Number);
-  const typeIds = [...new Set([...sells.map((o) => o.type_id), ...contractTypeIds, ...doctrineTypeIds, ...industryIds, ...buyTypeIds])];
+  const typeIds = [...new Set([...sells.map((o) => o.type_id), ...contractTypeIds, ...doctrineTypeIds, ...industryIds, ...buyTypeIds, ...rbuyTypeIds])];
   const jita = {};
   const vols = {}; // packaged m³ per type, from Janice
   for (let i = 0; i < typeIds.length; i += 500) {
@@ -268,7 +291,7 @@ async function main() {
   // 4. Type and issuer names (one endpoint handles both).
   const names = {};
   const issuerIds = [...new Set(contractsRaw.map((c) => c.issuer_id))];
-  const allIds = [...typeIds, ...issuerIds];
+  const allIds = [...typeIds, ...issuerIds, ...rbuySystemIds];
   for (let i = 0; i < allIds.length; i += 900) {
     const chunk = allIds.slice(i, i + 900);
     const res = await esiJson(`${ESI}/universe/names/`, {
@@ -558,7 +581,7 @@ async function main() {
 
     // Whole-market coverage: everything on the XHQ market joins the trade set.
     const marketTypeIds = [...new Set(sells.map((o) => o.type_id))];
-    const tradeIds = [...new Set([...doctrineTypeIds, ...industryIds, ...marketTypeIds, ...buyTypeIds])];
+    const tradeIds = [...new Set([...doctrineTypeIds, ...industryIds, ...marketTypeIds, ...buyTypeIds, ...rbuyTypeIds])];
 
     // Regional market velocity: average daily traded volume over the last 30
     // days from ESI market history (includes structure trades). ~1 request
@@ -611,12 +634,16 @@ async function main() {
     const buyList = Object.entries(bestBuy)
       .filter(([tid]) => !excluded(+tid))
       .map(([tid, b]) => ({ id: +tid, p: b.p, q: b.q, tq: b.tq }));
+    const rbuyList = rbuyEntries
+      .filter(([tid]) => !excluded(tid))
+      .map(([tid, b]) => ({ id: tid, p: b.p, q: b.q, tq: b.tq, sys: names[b.sys] || String(b.sys) }));
     writeFileSync(new URL("../trade.json", import.meta.url), JSON.stringify({
       generated: new Date().toISOString(),
       system: "XHQ-7V",
       items: tradeItems,
       losses,
       buys: buyList,
+      rbuys: rbuyList,
     }));
     console.log(`Wrote trade.json: ${tradeItems.length} types, ${losses.length} ship loss types (${Object.values(lossCount).reduce((a, b) => a + b, 0)} losses/30d), ${buyList.length} buy-order types.`);
   }
