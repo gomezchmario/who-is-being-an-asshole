@@ -321,6 +321,26 @@ async function main() {
   });
   contracts.sort((a, b) => (b.markup ?? -Infinity) - (a.markup ?? -Infinity));
 
+  // Permanent scalp log: every detected scalp is recorded forever, so the
+  // hall of shame survives the contract selling or being pulled.
+  const logFile = new URL("../scalp-log.json", import.meta.url);
+  let scalpLog = {};
+  try { scalpLog = JSON.parse(readFileSync(logFile, "utf8")).entries || {}; } catch {}
+  for (const c of contracts) {
+    if (!c.scalp) continue;
+    const prev = scalpLog[c.id];
+    scalpLog[c.id] = {
+      id: c.id, title: c.title, issuer: c.issuer, price: c.price, value: c.value,
+      markup: c.markup, hull: c.hull, scalp: c.scalp, expires: c.expires,
+      ...(c.doctrine && { doctrine: 1 }),
+      detected: prev?.detected || nowIso,
+    };
+  }
+  for (const e of Object.values(scalpLog)) {
+    if (!e.gone && !liveIds.has(String(e.id))) e.gone = nowIso;
+  }
+  writeFileSync(logFile, JSON.stringify({ entries: scalpLog }));
+
   // Update history with what's live now; drop entries stale for 60+ days.
   for (const c of contractsRaw) {
     const items = itemsCache[c.contract_id] || [];

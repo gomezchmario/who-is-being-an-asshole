@@ -43,8 +43,17 @@
         <button class="fbtn cbtn on" data-cat="all">ALL CONTRACTS</button>
         <button class="fbtn cbtn doctrine" data-cat="doctrine" title="Contracts containing a CVA doctrine ship hull">DOCTRINE SHIPS</button>
         <button class="fbtn cbtn scalper" data-cat="scalp" title="Physical items (tracked by item id) bought from a cheaper contract and relisted at a higher price by someone else — detection builds up as contracts churn">SCALPERS</button>
+        <button class="fbtn cbtn scalper" data-cat="scalplog" title="Every scalp ever caught, including contracts that have since sold or vanished">SCALP LOG</button>
       </div>
     </section>
+
+    <div id="scalp-notice" class="notice hidden">
+      ⚠ SCALP DETECTION CAME ONLINE 2026-09-04. CONCORD can only track flips it
+      witnessed: contracts bought and relisted before that date are invisible,
+      and the net tightens as surveillance history accumulates. Early days may
+      show few or no catches — that means young data, not honest citizens.
+      <span class="dim">This notice self-destructs after three months.</span>
+    </div>
 
     <section id="status" class="log"></section>
 

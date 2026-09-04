@@ -15,8 +15,11 @@
   ];
 
   let data = null;
+  let scalpLog = null; // {entries: {id: {...}}}
   const filters = { cat: "all" };
   const sort = { key: "markup", dir: -1 };
+  const SCALP_TRACKING_SINCE = "2026-09-04";
+  const NOTICE_UNTIL = new Date("2026-12-04");
 
   function tickClock() {
     $("clock").textContent = new Date().toISOString().slice(11, 19) + " EVE";
@@ -59,6 +62,11 @@
     const threshold = Math.max(0, Number($("threshold").value) || 20) / 100;
     const showAll = $("show-all").checked;
     $("threshold-label").textContent = Math.round(threshold * 100);
+
+    const scalpView = filters.cat === "scalp" || filters.cat === "scalplog";
+    $("scalp-notice").classList.toggle("hidden", !(scalpView && new Date() < NOTICE_UNTIL));
+
+    if (filters.cat === "scalplog") { renderLog(threshold); return; }
 
     const list = (data.contracts || []).slice();
     list.sort((a, b) => {
@@ -122,11 +130,65 @@
     $("results").classList.remove("hidden");
   }
 
+  // The permanent hall of shame: every scalp ever caught, live or not.
+  function renderLog(threshold) {
+    const entries = Object.values(scalpLog?.entries || {});
+    entries.sort((a, b) => {
+      let va = a[sort.key], vb = b[sort.key];
+      if (sort.key === "title" || sort.key === "issuer") {
+        return sort.dir * String(va || "").localeCompare(String(vb || ""));
+      }
+      return sort.dir * ((va ?? -Infinity) - (vb ?? -Infinity));
+    });
+
+    const rows = [];
+    let live = 0;
+    for (const e of entries) {
+      if (!e.gone) live++;
+      const v = verdictFor(e.markup ?? 0, threshold);
+      const gain = Math.round((e.price / e.scalp.paid - 1) * 100);
+      const status = !e.gone
+        ? "STILL LISTED"
+        : new Date(e.gone) < new Date(e.expires)
+          ? `SOLD ~${String(e.gone).slice(0, 10)}`
+          : `EXPIRED ${String(e.gone).slice(0, 10)}`;
+      const sub = `SCALPED — bought from ${e.scalp.from} for ${fmtIsk(e.scalp.paid)}, relisted +${gain}% · ` +
+        `caught ${String(e.detected).slice(0, 10)} · ${status}` + (e.hull && e.hull !== e.title ? ` · ${e.hull}` : "");
+      const tr = document.createElement("tr");
+      tr.className = "tier" + v.tier + (e.gone ? " gonerow" : "");
+      tr.innerHTML = `
+        <td class="left ${v.cls}"><span class="verdict">${v.label}</span></td>
+        <td class="left">
+          <span class="itemname">${escapeHtml(e.title || e.hull || `contract ${e.id}`)}</span>${e.doctrine ? ' <span class="galtag">DOCTRINE</span>' : ""} <span class="scalptag">SCALP</span>
+          <span class="struct scalpline">${escapeHtml(sub)}</span>
+        </td>
+        <td class="left"><a class="itemname" href="https://zkillboard.com/search/${encodeURIComponent(e.issuer)}/" target="_blank" rel="noopener">${escapeHtml(e.issuer)}</a></td>
+        <td class="num">${fmtIsk(e.price)}</td>
+        <td class="num">${fmtIsk(e.value)}</td>
+        <td class="num markup">${e.markup != null ? (e.markup >= 0 ? "+" : "") + Math.round(e.markup * 100) + "%" : "—"}</td>`;
+      rows.push(tr);
+    }
+    $("results-body").replaceChildren(...rows);
+    const summary = $("summary");
+    if (entries.length === 0) {
+      summary.innerHTML = `<span class="ok">NO SCALPS ON RECORD YET.</span> <span class="dim">(tracking since ${SCALP_TRACKING_SINCE})</span>`;
+    } else {
+      summary.innerHTML = `<span class="count">${entries.length}</span> SCALP${entries.length === 1 ? "" : "S"} ON RECORD SINCE ${SCALP_TRACKING_SINCE}` +
+        ` <span class="dim">(${live} still listed)</span>`;
+    }
+    $("scan-info").innerHTML = `LAST SCAN: <b>${fmtAge(data.generated)}</b> · SYSTEM: <b>${escapeHtml(data.system || "XHQ-7V")}</b> · PERMANENT RECORD`;
+    $("results").classList.remove("hidden");
+  }
+
   function log(msg, isErr) {
     $("status").innerHTML = isErr ? `<span class="err">${escapeHtml(msg)}</span>` : escapeHtml(msg);
   }
 
   async function load() {
+    fetch("scalp-log.json", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) { scalpLog = d; if (filters.cat === "scalplog") render(); } })
+      .catch(() => {});
     try {
       const res = await fetch("contracts.json", { cache: "no-cache" });
       if (!res.ok) throw new Error("HTTP " + res.status);
