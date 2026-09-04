@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WHO IS BEING AN ASSHOLE? — SECRET SAUCE</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💢</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css?v=26">
+  <style>
+    .doc { max-width: 900px; margin: 0 auto; line-height: 1.6; }
+    .doc h2 {
+      font-family: "VT323", monospace; font-size: 26px; color: var(--phosphor);
+      border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-top: 36px;
+    }
+    .doc h3 { color: var(--amber); font-size: 15px; margin-top: 22px; }
+    .doc p, .doc li { color: var(--phosphor-dim); font-size: 14px; }
+    .doc strong { color: var(--phosphor); }
+    .doc code {
+      background: #04120a; border: 1px solid var(--border); color: var(--phosphor);
+      padding: 1px 5px; font-family: "Share Tech Mono", monospace; font-size: 13px;
+    }
+    .doc pre {
+      background: #04120a; border: 1px solid var(--border); color: var(--phosphor);
+      padding: 12px 14px; overflow-x: auto; font-family: "Share Tech Mono", monospace;
+      font-size: 12.5px; line-height: 1.5;
+    }
+    .doc table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    .doc th, .doc td { border: 1px solid var(--border); padding: 6px 10px; font-size: 13px; text-align: left; }
+    .doc th { color: var(--phosphor); background: rgba(51,255,102,0.06); }
+    .doc td { color: var(--phosphor-dim); }
+    .doc a { color: var(--amber); }
+    .toc { columns: 2; gap: 24px; }
+    .toc a { color: var(--phosphor-dim); text-decoration: none; font-size: 13px; }
+    .toc a:hover { color: var(--phosphor); }
+    .badge { display: inline-block; border: 1px solid #c86bff; color: #dd9bff; font-size: 11px; padding: 0 5px; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <div class="crt" aria-hidden="true"></div>
+
+  <main class="terminal">
+    <header>
+      <div class="topline">
+        <span>CONCORD ENGINEERING ARCHIVE // RESTRICTED</span>
+        <span id="clock">--:--:--</span>
+      </div>
+      <a class="market-btn nav-btn" href="../index.html" title="Back to the market gouging detector">◂ MAIN</a>
+      <h1 class="title">SECRET <span class="red glitch">SAUCE</span></h1>
+      <p class="subtitle">▸ HOW THIS WHOLE THING ACTUALLY WORKS ◂</p>
+      <p class="tagline">unlisted page · architecture writeup, not a feature</p>
+    </header>
+
+    <section class="panel doc">
+      <p>This is the whole app, explained plainly: what it's built from, how data
+      moves from EVE's servers to your screen, and — since this build leaned on an
+      AI pair-programmer for every line — what it would take to build the same
+      thing by hand, the "traditional" way. Nothing here is required reading to
+      <em>use</em> the site; it's for whoever's curious, or wants to build
+      something like it themselves.</p>
+
+      <div class="toc">
+        <a href="#overview">1. The one-paragraph version</a>
+        <a href="#stack">2. The stack</a>
+        <a href="#pages">3. The five pages</a>
+        <a href="#pipeline">4. The data pipeline</a>
+        <a href="#auth">5. Auth & scopes</a>
+        <a href="#apis">6. External APIs</a>
+        <a href="#hosting">7. Hosting & domain</a>
+        <a href="#reliability">8. Keeping it alive</a>
+        <a href="#fromscratch">9. Building it from zero, by hand</a>
+        <a href="#limits">10. Where the corners were cut</a>
+      </div>
+
+      <h2 id="overview">1. The one-paragraph version</h2>
+      <p>There is no server, no database, and no backend process that answers
+      requests. Every page is a static HTML file with vanilla JavaScript,
+      hosted for free on <strong>GitHub Pages</strong>. A <strong>GitHub
+      Actions</strong> cron job runs on a schedule (independent of any visitor
+      loading the site), logs into EVE's API with a stored authentication
+      token, pulls the market and contract data for one specific structure,
+      prices everything against Jita and Amarr, and writes the results as
+      plain <code>.json</code> files back into the same git repository. The
+      browser pages simply <code>fetch()</code> those JSON files and render
+      tables with JavaScript. That's the entire trick: a cron job plus
+      committed JSON <em>is</em> the database.</p>
+
+      <h2 id="stack">2. The stack</h2>
+      <table>
+        <tr><th>Layer</th><th>Choice</th><th>Why</th></tr>
+        <tr><td>Frontend</td><td>Plain HTML/CSS/JS, no framework</td><td>Five pages, no shared component tree complex enough to need React/Vue — a build step would add friction for zero benefit here.</td></tr>
+        <tr><td>Styling</td><td>One shared <code>style.css</code></td><td>Retro CRT/terminal look via CSS variables (phosphor green, amber, scanline overlay), reused across every page.</td></tr>
+        <tr><td>Data fetching (runtime)</td><td>Static JSON files (<code>data.json</code>, <code>contracts.json</code>, <code>trade.json</code>, etc.)</td><td>No API server to host or pay for — the browser just downloads a file over CDN, same as fetching an image.</td></tr>
+        <tr><td>Data fetching (backend job)</td><td>Node.js script (<code>scripts/fetch-data.mjs</code>), ~700 lines</td><td>Runs once per scan, calls external APIs, writes the JSON files, exits. No process stays running.</td></tr>
+        <tr><td>Scheduler</td><td>GitHub Actions <code>cron</code> trigger</td><td>Free compute minutes on public repos; no server to patch or pay for.</td></tr>
+        <tr><td>Hosting</td><td>GitHub Pages</td><td>Free static hosting directly from the repo, HTTPS included.</td></tr>
+        <tr><td>DNS</td><td>Cloudflare (DNS-only / "grey cloud")</td><td>Free custom-domain DNS with CNAME flattening at the zone apex.</td></tr>
+        <tr><td>Analytics</td><td>GoatCounter</td><td>Free, privacy-respecting page-view counter — no cookies, no user tracking.</td></tr>
+        <tr><td>Version control / CI</td><td>Git + GitHub</td><td>The commit history <em>is</em> the audit trail for every market scan.</td></tr>
+      </table>
+      <p>Total recurring cost: <strong>$0</strong>, aside from the ~$10/yr domain
+      registration. No servers, no cloud bill, no database subscription.</p>
+
+      <h2 id="pages">3. The five pages</h2>
+      <ul>
+        <li><strong>index.html</strong> (market) — every sell order at the
+        structure, judged against Jita. Filterable by category, price, verdict.</li>
+        <li><strong>contracts.html</strong> — public item-exchange contracts at
+        the structure, judged the same way, plus scam/scalp detection.</li>
+        <li><strong>manual.html</strong> (Manual Lookup) — paste a contract's
+        in-game item list, get an instant Jita/Amarr appraisal. Exists because
+        ESI cannot show contracts privately assigned to an alliance or corp —
+        this is the manual workaround.</li>
+        <li><strong>war-room/</strong> — alliance-shared doctrine readiness:
+        "can we actually buy our fleet doctrines locally right now?"</li>
+        <li><strong>trade-room/</strong> — private (pilot + corp only) profit
+        tooling: hauling cost model, buy-order bounty finder, manufacturing
+        ideas, kill-loss demand signals.</li>
+      </ul>
+      <p>All five load the same shared <code>style.css</code>, and each ships
+      its own small JS file (or an inline <code>&lt;script&gt;</code> for
+      the simpler pages) that fetches its JSON, filters/sorts it in memory,
+      and re-renders an HTML table on every filter change. There is no
+      routing library — every page is a genuinely separate file, linked by
+      plain <code>&lt;a href&gt;</code> tags.</p>
+
+      <h2 id="pipeline">4. The data pipeline</h2>
+      <p>Every ~30 minutes, <code>.github/workflows/update-market.yml</code>
+      spins up a disposable Ubuntu runner and executes
+      <code>scripts/fetch-data.mjs</code>. In order, that script:</p>
+      <ol>
+        <li>Exchanges a stored EVE SSO <strong>refresh token</strong> for a
+        short-lived access token (OAuth2 <code>refresh_token</code> grant).</li>
+        <li>Calls ESI's public regional order feed to discover which player
+        structures exist in the target system (structure IDs leak through
+        buy orders in the public feed even though sell orders don't).</li>
+        <li>Calls the authenticated <code>/markets/structures/{id}/</code>
+        endpoint to pull the full order book for the known structure — this
+        needs the character to have docking/market access there.</li>
+        <li>Pulls public contracts at that structure from
+        <code>/contracts/public/{region}/</code>, plus each authenticated
+        character's own contract list (to catch alliance/corp-assigned ones —
+        with the caveat in §10).</li>
+        <li>Sends every item type ID seen so far to the
+        <a href="https://janice.e-351.com/" target="_blank" rel="noopener">Janice</a>
+        pricing API to get Jita 4-4 and Amarr min-sell reference prices (falling
+        back to a 5-day median when an item has no live sell orders).</li>
+        <li>Cross-references <a href="https://zkillboard.com/" target="_blank" rel="noopener">zKillboard</a>
+        for recent alliance losses (feeds the war room's "N lost/30d" tags)
+        and a hand-maintained doctrine-fit snapshot for readiness checks.</li>
+        <li>Diffs everything against the previous run to flag scalping
+        (an item bought cheap and relisted higher, tracked by EVE's per-item
+        <code>item_id</code>, which survives a contract sale).</li>
+        <li>Writes out ~10 JSON files (<code>data.json</code>,
+        <code>contracts.json</code>, <code>trade.json</code>, a scalp log, a
+        zKillboard cache, a price-history cache, …) and <code>git commit</code>
+        + <code>git push</code>es them straight back to <code>main</code>.</li>
+      </ol>
+      <p>GitHub Pages picks up the new commit automatically and republishes
+      within about a minute; the CDN edge cache then takes up to ~10 minutes
+      to catch up, which is why the site's JS/CSS assets are all versioned
+      with a <code>?v=N</code> query string bumped on every change — otherwise
+      visitors could get new HTML paired with a stale cached script.</p>
+
+      <h2 id="auth">5. Auth & scopes</h2>
+      <p>EVE's SSO uses standard OAuth2. A one-time local script
+      (<code>scripts/get-token.mjs</code>) opens a browser login and captures
+      a long-lived <strong>refresh token</strong>, which is stored as an
+      encrypted GitHub Actions secret — never committed to the repo, never
+      visible in logs. Two scopes matter here:</p>
+      <ul>
+        <li><code>esi-markets.structure_markets.v1</code> — read a player
+        structure's market order book (requires the character to actually
+        have docking/market access there).</li>
+        <li><code>esi-contracts.read_character_contracts.v1</code> — read a
+        character's own contracts (issuer/acceptor/assignee only — see §10 for
+        why this doesn't fully solve alliance-contract visibility).</li>
+      </ul>
+      <p>Each scan refreshes the access token fresh (they expire in ~20
+      minutes), so nothing long-lived beyond the refresh token itself needs
+      to be trusted.</p>
+
+      <h2 id="apis">6. External APIs, and why each one</h2>
+      <table>
+        <tr><th>API</th><th>Used for</th></tr>
+        <tr><td>EVE ESI</td><td>Market orders, contracts, universe/type names, structure info — the canonical game data source.</td></tr>
+        <tr><td>Janice</td><td>Jita 4-4 / Amarr VIII reference sell prices, with a live-order-book depth Fuzzwork's plain aggregates don't always capture as cleanly.</td></tr>
+        <tr><td>Fuzzwork aggregates</td><td>A keyless, CORS-open fallback price source used client-side in Manual Lookup for items the site doesn't already track — Janice needs an API key that can't be exposed in browser JS.</td></tr>
+        <tr><td>zKillboard</td><td>Alliance loss history, to show which doctrine hulls are actually dying and need restocking.</td></tr>
+        <tr><td>GoatCounter</td><td>Anonymous visit counting for the small "· N" footer figure.</td></tr>
+      </table>
+
+      <h2 id="hosting">7. Hosting & the custom domain</h2>
+      <p>GitHub Pages serves the repo's root directly. The custom domain
+      (<code>xhq7v.trade</code>) points at GitHub Pages via Cloudflare DNS
+      set to <strong>DNS-only</strong> ("grey cloud," not proxied) — GitHub
+      Pages needs to see the real visitor to issue and renew its own Let's
+      Encrypt certificate, and a proxying CDN in front of it can interfere
+      with that. Cloudflare's CNAME flattening lets the domain's bare apex
+      (no <code>www.</code>) point at GitHub Pages the same way a subdomain
+      would. A <code>CNAME</code> file at the repo root tells GitHub Pages
+      which domain to serve.</p>
+
+      <h2 id="reliability">8. Keeping the scan alive</h2>
+      <p>GitHub's cron scheduler is <em>best-effort</em> — on free public
+      repos, scheduled runs at the top of common minutes (like <code>:00</code>
+      and <code>:30</code>) compete with everyone else's crons and can get
+      silently delayed or dropped. Two mitigations are layered on top:</p>
+      <ul>
+        <li>The cron itself is offset to off-beat minutes (<code>7,37 * * * *</code>)
+        to dodge the stampede.</li>
+        <li>A local Windows Scheduled Task on the operator's own PC pings the
+        workflow's <code>workflow_dispatch</code> trigger every 30 minutes
+        whenever the machine is on, first checking whether a scan already ran
+        recently so it never double-fires. It's launched invisibly (a VBScript
+        wrapper hides the console window) via <code>gh</code>, the GitHub CLI,
+        already authenticated on that machine.</li>
+      </ul>
+
+      <h2 id="fromscratch">9. Building the same thing from zero, without an AI pair-programmer</h2>
+      <p>None of this requires exotic technology — it's a static site plus a
+      scheduled script, which is one of the oldest patterns in web development
+      (the "Jamstack" approach, or even older: this is basically how sites
+      worked before dynamic backends were affordable). Here's the roadmap a
+      developer would follow by hand:</p>
+
+      <h3>Step 1 — Learn the domain's data source</h3>
+      <p>Read EVE's <a href="https://esi.evetech.net/ui/" target="_blank" rel="noopener">ESI documentation</a>
+      end to end: which endpoints are public vs. authenticated, what OAuth
+      scopes gate what, and the shape of market order / contract JSON
+      responses. Budget a few days just reading docs and poking the API with
+      <code>curl</code> before writing any code — this is true of integrating
+      with any third-party API.</p>
+
+      <h3>Step 2 — OAuth2, by hand</h3>
+      <p>Register an application in EVE's developer portal, implement the
+      OAuth2 "Authorization Code" flow once (a tiny local HTTP server that
+      catches the redirect, exchanges the code for tokens) to mint one
+      refresh token, then implement the much simpler "refresh_token" grant
+      the recurring job actually uses. This is standard OAuth2 client code —
+      any backend language's HTTP client and a basic understanding of
+      <code>Authorization: Bearer</code> headers gets you there. Estimated
+      effort: a day, mostly spent reading OAuth2 flow diagrams and testing.</p>
+
+      <h3>Step 3 — Write the fetch/transform script</h3>
+      <p>In any language with an HTTP client and JSON support (Node.js, Python,
+      Go — doesn't matter), write a script that: gets a token, calls the
+      market/contracts endpoints, calls a pricing API for reference values,
+      computes a markup percentage per item, and writes the result to a JSON
+      file. This is "extract, transform, load" — plain data-processing code,
+      no framework needed. Expect iteration here: real API responses always
+      have edge cases (items with no sell orders, paginated endpoints,
+      capital ships that don't sell at the reference hub) that only show up
+      once you're looking at live data. Estimated effort for a competent
+      backend developer: 3-5 days to get a robust version, including error
+      handling and retries.</p>
+
+      <h3>Step 4 — Static frontend</h3>
+      <p>Write plain HTML pages with <code>&lt;script&gt;</code> tags that
+      <code>fetch()</code> the JSON and render an HTML table — this is
+      "vanilla JS DOM manipulation," a skill that predates every modern
+      frontend framework. A CSS file defines the visual theme. No build
+      tooling (webpack, Vite, npm bundlers) is strictly required for a project
+      this size — you can open the HTML file directly in a browser and see
+      it work. Estimated effort: 1-2 weeks for someone comfortable with
+      JavaScript and CSS, more if learning DOM APIs for the first time,
+      building up filtering/sorting/search interactions one at a time.</p>
+
+      <h3>Step 5 — Automate it</h3>
+      <p>Write a GitHub Actions workflow file (YAML) that checks out the
+      repo, installs Node, runs the script with secrets injected as
+      environment variables, and commits+pushes any changed files on a
+      cron schedule. GitHub's own
+      <a href="https://docs.github.com/en/actions" target="_blank" rel="noopener">Actions documentation</a>
+      and the <code>actions/checkout</code> / <code>actions/setup-node</code>
+      examples cover this pattern directly. Estimated effort: half a day,
+      mostly fighting YAML indentation and secret-scoping the first time.</p>
+
+      <h3>Step 6 — Deploy and point a domain at it</h3>
+      <p>Enable GitHub Pages in the repo settings, buy a domain from any
+      registrar, add DNS records (or use Cloudflare) pointing it at GitHub
+      Pages, and add a <code>CNAME</code> file. GitHub's own Pages docs walk
+      through custom domains directly. Estimated effort: an afternoon,
+      including waiting for DNS propagation and HTTPS certificate issuance.</p>
+
+      <h3>Total, from scratch</h3>
+      <p>For one experienced full-stack-adjacent developer already comfortable
+      with JavaScript, HTTP/JSON, and OAuth2 concepts: roughly
+      <strong>2-4 weeks</strong> of focused part-time work to reach feature
+      parity with the current market + contracts pages alone. The war room,
+      trade room, and manual lookup pages each layer on additional domain
+      logic (doctrine-fit modeling, hauling-cost math, scalp detection via
+      persistent item IDs) that would each add several more days on top. None
+      of it requires senior-level expertise — it's squarely "solid intermediate
+      web developer" work — but there's a lot of small, fiddly domain-specific
+      logic (capital ships not selling at Jita, fighters needing squadron-load
+      math, EVE's contract items being immutable so they can be cached
+      forever) that comes only from iterating against real data, which is
+      where most of the actual time goes.</p>
+
+      <h2 id="limits">10. Where the corners were cut (on purpose)</h2>
+      <ul>
+        <li><strong>No database.</strong> Git + JSON files work fine at this
+        scale (thousands of rows, one writer, revisions every 30 minutes) but
+        wouldn't scale to many structures or high write concurrency. A real
+        multi-structure version would want Postgres/SQLite and an actual API
+        layer.</li>
+        <li><strong>Alliance-assigned contracts are genuinely invisible to
+        ESI</strong> — the character-contracts endpoint only returns
+        contracts where that specific character is the issuer, acceptor, or
+        assignee, never ones merely "available to the alliance." This was
+        confirmed empirically (an alt with alliance visibility in-game still
+        returned zero contracts via ESI). The Manual Lookup page exists
+        specifically to route around this ESI limitation, not fix it.</li>
+        <li><strong>No server-side rate limiting or caching layer</strong> —
+        relies on each upstream API's own limits (ESI, Janice, Fuzzwork) and
+        on GitHub Pages' CDN for the frontend's own traffic.</li>
+        <li><strong>The scheduler is best-effort</strong>, hence the local
+        PC backup ping described in §8 — a "real" production deployment would
+        run the cron on infrastructure with guaranteed scheduling (a small VPS,
+        a managed cron service, etc.) instead of leaning on free CI minutes.</li>
+      </ul>
+
+      <p class="dim small" style="margin-top:30px">This page is unlisted —
+      it isn't linked from any other page on the site, and isn't meant to be.
+      Nothing here is a secret in the "don't tell anyone" sense; it's called
+      that because it's the part visitors never see, not because it's
+      sensitive.</p>
+    </section>
+
+    <footer>
+      <p class="dim small">Not affiliated with CCP Games.</p>
+    </footer>
+  </main>
+
+  <script>
+    function tickClock() {
+      document.getElementById("clock").textContent = new Date().toISOString().slice(11, 19) + " EVE";
+    }
+    setInterval(tickClock, 1000); tickClock();
+  </script>
+  <script data-goatcounter="https://xhq.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
