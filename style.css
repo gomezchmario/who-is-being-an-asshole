@@ -296,6 +296,7 @@ tr:hover td.placeholder { background: none; }
   color: var(--phosphor);
   font-family: inherit;
   font-size: 14px;
+  margin: 8px 0;
   padding: 5px 10px;
   width: 220px;
   align-self: center;
