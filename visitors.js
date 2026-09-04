@@ -7,7 +7,7 @@
     .then((d) => {
       if (!d?.count) return;
       const el = document.getElementById("visitors");
-      if (el) el.textContent = " · " + String(d.count).trim() + " capsuleers surveilled";
+      if (el) el.textContent = " · " + String(d.count).trim();
     })
     .catch(() => {});
 })();
