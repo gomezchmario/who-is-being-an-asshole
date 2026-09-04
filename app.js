@@ -20,6 +20,7 @@
   const SUPPORTER = { label: "▒ SUPPORTER", cls: "v7", tier: 7 };
   const LOCAL = { label: "░ LOCAL", cls: "v8", tier: 8 };
   const HONEST = { label: "░ HONEST", cls: "v0", tier: 0 };
+  const SUS = { label: "▒ SUS", cls: "v9", tier: 9 };
 
   let data = null;
 
@@ -97,6 +98,7 @@
     for (const cand of VERDICTS) {
       if (pct >= Math.round((cand.min ?? threshold) * 100)) return cand;
     }
+    if (pct >= 19) return SUS;
     return HONEST;
   }
 

@@ -400,6 +400,7 @@ tbody tr:hover { background: rgba(51, 255, 102, 0.06); }
 .v6 { color: #6be7ff; }                          /* saint */
 .v7 { color: #7dffb0; }                          /* supporter */
 .v8 { color: #baffd1; }                          /* local */
+.v9 { color: #d8ff6b; }                          /* sus */
 .v4 .verdict, tr.tier4 td.markup { text-shadow: 0 0 8px rgba(255, 59, 59, 0.7); }
 .v5 .verdict, tr.tier5 td.markup {
   text-shadow: 0 0 12px rgba(255, 59, 59, 0.9);
@@ -415,6 +416,7 @@ tr.tier4 td.markup, tr.tier5 td.markup { color: var(--red); }
 tr.tier6 td.markup { color: #6be7ff; }
 tr.tier7 td.markup { color: #7dffb0; }
 tr.tier8 td.markup { color: #baffd1; }
+tr.tier9 td.markup { color: #d8ff6b; }
 tr.tier0 td.markup { color: var(--phosphor); }
 
 .struct { color: var(--phosphor-faint); font-size: 12px; display: block; }
