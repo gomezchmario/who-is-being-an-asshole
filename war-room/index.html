@@ -81,12 +81,12 @@
 
     <section id="missing-wrap" class="hidden">
       <details class="doctrine misspanel" open>
-        <summary>DOCTRINE AMMO / DRONES NOT SOLD IN XHQ</summary>
+        <summary>DOCTRINE AMMO / DRONES NOT AVAILABLE IN XHQ</summary>
         <ul id="missing-ammo"></ul>
         <div id="stocked-ammo"></div>
       </details>
       <details class="doctrine misspanel" open>
-        <summary>DOCTRINE IMPLANTS NOT SOLD IN XHQ</summary>
+        <summary>DOCTRINE IMPLANTS NOT AVAILABLE IN XHQ</summary>
         <div id="missing-implants"></div>
         <div id="stocked-implants"></div>
       </details>
@@ -239,12 +239,31 @@
     function render(data) {
       $("scan-info").innerHTML = `LAST SCAN: <b>${age(data.generated)}</b> · SYSTEM: <b>${esc(data.system)}</b> · ${data.doctrines.length} doctrines`;
 
-      const fillMissing = (elId, list) => {
-        $(elId).innerHTML = list.length
-          ? list.map((m) => `<li>${esc(m.name)} <span class="dim">(${m.fits} fit${m.fits > 1 ? "s" : ""})</span></li>`).join("")
-          : '<li class="ok-inline">nothing missing — miracle confirmed</li>';
-      };
-      fillMissing("missing-ammo", data.missingAmmo || []);
+      // Aggregate the doctrine consumables/implants that ARE on the market
+      // (stock, largest per-fit load, prices) — used both to promote
+      // critically-low items into the "not available" lists and for the
+      // stocked-items tables.
+      const agg = new Map();
+      for (const d of data.doctrines) for (const f of d.fits) for (const it of f.items) {
+        if (!it.mkt) continue;
+        const e = agg.get(it.id) || { name: it.name, cat: it.cat, q: it.mkt.q, min: it.mkt.min, jita: it.jita, amarr: it.amarr, maxQ: 0 };
+        e.maxQ = Math.max(e.maxQ, it.qty);
+        agg.set(it.id, e);
+      }
+      const isDrugName = (n) => /Booster$|\sDose\s/.test(n);
+      const loadsOf = (e) => Math.floor(e.q / e.maxQ);
+      // Under 3 fit-loads of ammo, or under 3 doses of a drug, counts as
+      // not available.
+      const lowAmmo = [...agg.values()].filter((e) => [8, 18, 87].includes(e.cat) && loadsOf(e) < 3);
+      const lowDrugs = [...agg.values()].filter((e) => e.cat === 20 && isDrugName(e.name) && e.q < 3);
+
+      const ammoList = [
+        ...(data.missingAmmo || []),
+        ...lowAmmo.map((e) => ({ name: e.name, low: `only ${e.q.toLocaleString("en-US")} left ≈ ${loadsOf(e)} load${loadsOf(e) === 1 ? "" : "s"}` })),
+      ];
+      $("missing-ammo").innerHTML = ammoList.length
+        ? ammoList.map((m) => `<li>${esc(m.name)} <span class="dim">(${m.low ? m.low : m.fits + " fit" + (m.fits > 1 ? "s" : "")})</span></li>`).join("")
+        : '<li class="ok-inline">nothing missing — miracle confirmed</li>';
 
       // Implants grouped by set: "Mid-grade Amulet Gamma" -> set "Mid-grade
       // Amulet", piece "Gamma". Hardwirings collect at the bottom.
@@ -257,9 +276,10 @@
         if (sm) {
           if (!sets.has(sm[1])) sets.set(sm[1], []);
           sets.get(sm[1]).push(sm[2]);
-        } else if (/Booster$|\sDose\s/.test(m.name)) drugs.push(m.name);
+        } else if (isDrugName(m.name)) drugs.push(esc(m.name));
         else hardwirings.push(m.name);
       }
+      for (const e of lowDrugs) drugs.push(`${esc(e.name)} <span class="dim">(only ${e.q} dose${e.q === 1 ? "" : "s"} left)</span>`);
       const SLOT_ORDER = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Omega", "CA-1", "CA-2", "CA-3", "CA-4"];
       const setRows = [...sets.entries()]
         .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
@@ -268,7 +288,7 @@
           return `<li><b>${esc(set)}</b> <span class="dim">— missing ${pieces.length}:</span> ${pieces.map(esc).join(", ")}</li>`;
         });
       const hwRows = hardwirings.sort().map((n) => `<li>${esc(n)}</li>`);
-      const drugRows = drugs.sort().map((n) => `<li>${esc(n)}</li>`);
+      const drugRows = drugs.sort().map((n) => `<li>${n}</li>`);
       $("missing-implants").innerHTML = setRows.length + hwRows.length + drugRows.length
         ? (setRows.length ? `<div class="misshead">SETS</div><ul>${setRows.join("")}</ul>` : "") +
           (hwRows.length ? `<div class="misshead">HARDWIRINGS</div><ul>${hwRows.join("")}</ul>` : "") +
@@ -276,40 +296,53 @@
         : '<ul><li class="ok-inline">nothing missing — miracle confirmed</li></ul>';
       $("missing-wrap").classList.remove("hidden");
 
-      // Doctrine consumables/implants we DO have on the XHQ market: stock,
-      // rough fit-loads remaining, and markup vs the hubs.
-      const agg = new Map();
-      for (const d of data.doctrines) for (const f of d.fits) for (const it of f.items) {
-        if (!it.mkt) continue;
-        const e = agg.get(it.id) || { name: it.name, cat: it.cat, q: it.mkt.q, min: it.mkt.min, jita: it.jita, amarr: it.amarr, maxQ: 0 };
-        e.maxQ = Math.max(e.maxQ, it.qty);
-        agg.set(it.id, e);
-      }
+      // Stocked-items tables (what we DO have), with sortable columns.
       const stockedTable = (elId, items, isAmmo) => {
         if (!items.length) { $(elId).innerHTML = ""; return; }
         const rows = items.map((e) => {
-          const loads = Math.floor(e.q / e.maxQ);
+          const loads = loadsOf(e);
           const low = isAmmo ? loads < 10 : e.q < 5;
+          const jp = e.jita ? e.min / e.jita - 1 : null;
+          const ap = e.amarr ? e.min / e.amarr - 1 : null;
           return `<tr class="${low ? "lowrow" : ""}">
-            <td class="left">${esc(e.name)}${low ? " ⚠" : ""}</td>
-            <td class="num">${e.q.toLocaleString("en-US")}</td>
-            ${isAmmo ? `<td class="num">${loads}</td>` : ""}
-            <td class="num">${isk(e.min)}</td>
-            <td class="num">${pctTag(e.jita ? e.min / e.jita - 1 : null) || "—"}</td>
-            <td class="num">${pctTag(e.amarr ? e.min / e.amarr - 1 : null) || "—"}</td>
+            <td class="left" data-v="${esc(e.name)}">${esc(e.name)}${low ? " ⚠" : ""}</td>
+            <td class="num" data-v="${e.q}">${e.q.toLocaleString("en-US")}</td>
+            ${isAmmo ? `<td class="num" data-v="${loads}">${loads}</td>` : ""}
+            <td class="num" data-v="${e.min}">${isk(e.min)}</td>
+            <td class="num" data-v="${jp ?? -999}">${pctTag(jp) || "—"}</td>
+            <td class="num" data-v="${ap ?? -999}">${pctTag(ap) || "—"}</td>
           </tr>`;
         }).join("");
         $(elId).innerHTML = `<details class="stocked">
           <summary>view the ${items.length} type${items.length > 1 ? "s" : ""} we DO have — stock &amp; markup</summary>
           <div class="tablewrap"><table>
-            <thead><tr><th class="left">ITEM</th><th class="num">STOCK</th>${isAmmo ? '<th class="num" title="Stock divided by the largest per-fit load">~FIT LOADS</th>' : ""}<th class="num">XHQ MIN</th><th class="num">vs JITA</th><th class="num">vs AMARR</th></tr></thead>
+            <thead><tr><th class="left sortable">ITEM<span class="arrow"></span></th><th class="num sortable">STOCK<span class="arrow"></span></th>${isAmmo ? '<th class="num sortable" title="Stock divided by the largest per-fit load">~FIT LOADS<span class="arrow"></span></th>' : ""}<th class="num sortable">XHQ MIN<span class="arrow"></span></th><th class="num sortable">vs JITA<span class="arrow"></span></th><th class="num sortable">vs AMARR<span class="arrow"></span></th></tr></thead>
             <tbody>${rows}</tbody>
           </table></div>
         </details>`;
+        // Column sorting: sorts by the raw value stashed in data-v.
+        const table = $(elId).querySelector("table");
+        const ths = [...table.querySelectorAll("th")];
+        ths.forEach((th, idx) => th.addEventListener("click", () => {
+          const dir = th.dataset.dir === "asc" ? -1 : 1;
+          ths.forEach((t) => { delete t.dataset.dir; t.querySelector(".arrow").textContent = " ·"; });
+          th.dataset.dir = dir === 1 ? "asc" : "desc";
+          th.querySelector(".arrow").textContent = dir === 1 ? " ▲" : " ▼";
+          const tbody = table.querySelector("tbody");
+          [...tbody.rows]
+            .sort((a, b) => {
+              const va = a.cells[idx].dataset.v, vb = b.cells[idx].dataset.v;
+              const na = parseFloat(va), nb = parseFloat(vb);
+              return dir * (isNaN(na) || isNaN(nb) ? String(va).localeCompare(String(vb)) : na - nb);
+            })
+            .forEach((r) => tbody.appendChild(r));
+        }));
       };
-      const byLoads = (a, b) => Math.floor(a.q / a.maxQ) - Math.floor(b.q / b.maxQ);
-      stockedTable("stocked-ammo", [...agg.values()].filter((e) => [8, 18, 87].includes(e.cat)).sort(byLoads), true);
-      stockedTable("stocked-implants", [...agg.values()].filter((e) => e.cat === 20).sort((a, b) => a.q - b.q), false);
+      const byLoads = (a, b) => loadsOf(a) - loadsOf(b);
+      stockedTable("stocked-ammo",
+        [...agg.values()].filter((e) => [8, 18, 87].includes(e.cat) && loadsOf(e) >= 3).sort(byLoads), true);
+      stockedTable("stocked-implants",
+        [...agg.values()].filter((e) => e.cat === 20 && !(isDrugName(e.name) && e.q < 3)).sort((a, b) => a.q - b.q), false);
 
       const ds = data.doctrines.slice();
       const pinned = [];
