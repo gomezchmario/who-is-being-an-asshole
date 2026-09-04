@@ -543,6 +543,28 @@ async function main() {
       .sort((a, b) => b.n - a.n);
 
     const tradeIds = [...new Set([...doctrineTypeIds, ...industryIds])];
+
+    // Regional market velocity: average daily traded volume over the last 30
+    // days from ESI market history (includes structure trades). ~1 request
+    // per type, so refreshed once per UTC day and cached in between.
+    const histFile = new URL("../history-cache.json", import.meta.url);
+    let hist2 = { date: null, vols: {} };
+    try { hist2 = JSON.parse(readFileSync(histFile, "utf8")); } catch {}
+    const today = new Date().toISOString().slice(0, 10);
+    if (hist2.date !== today) {
+      const vols30 = {};
+      await inBatches(tradeIds, 5, async (tid) => {
+        const res = await esiJson(`${ESI}/markets/${REGION_ID}/history/?type_id=${tid}`, {}, 1);
+        if (res?.error || !Array.isArray(res?.json)) { vols30[tid] = 0; return; }
+        const cutoff30 = Date.now() - 30 * 86400e3;
+        const vol = res.json.filter((d) => new Date(d.date).getTime() >= cutoff30)
+          .reduce((s, d) => s + d.volume, 0);
+        vols30[tid] = Math.round((vol / 30) * 100) / 100;
+      });
+      hist2 = { date: today, vols: vols30 };
+      writeFileSync(histFile, JSON.stringify(hist2));
+      console.log(`Refreshed market history for ${tradeIds.length} types.`);
+    }
     const tradeItems = tradeIds.map((tid) => {
       const m = xhqMkt[tid];
       return {
@@ -554,6 +576,7 @@ async function main() {
         amarr: amarr[tid] ?? null,
         xhq: m ? { q: m.q, min: m.min } : null,
         fits: usedTypes.get(tid) || 0,
+        mov: hist2.vols[tid] ?? 0,
         ...(industryIds.includes(tid) && { ind: 1 }),
         ...(lossCount[tid] && { lost: lossCount[tid] }),
       };

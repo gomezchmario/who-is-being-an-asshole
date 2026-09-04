@@ -139,11 +139,13 @@
             <th class="num sortable">m³<span class="arrow"></span></th>
             <th class="num sortable">PROFIT/U<span class="arrow"></span></th>
             <th class="num sortable">PROFIT/m³<span class="arrow"></span></th>
+            <th class="num sortable" title="Average units traded per day in Providence over 30 days (ESI market history)">MOVES/D<span class="arrow"></span></th>
+            <th class="num sortable" title="profit per unit × daily volume — the realistic daily profit ceiling">ISK/DAY<span class="arrow"></span></th>
             <th class="num sortable" title="profit / (Jita cost + haul)">ROI<span class="arrow"></span></th>
           </tr></thead>
           <tbody id="opp-body"></tbody>
         </table></div>
-        <p class="note" style="margin-bottom:0">SELL @ = current XHQ min − 0.1% undercut, or Jita + your margin when nothing is stocked. Profit is per unit after Jita purchase, hauling, broker fee and sales tax. Rows cap at 400 — use the filters.</p>
+        <p class="note" style="margin-bottom:0">SELL @ = current XHQ min − 0.1% undercut, or Jita + your margin when nothing is stocked. Profit is per unit after Jita purchase, hauling, broker fee and sales tax. MOVES/D is real Providence turnover from market history, and ISK/DAY = profit × turnover — the default sort, i.e. what actually pays. Rows cap at 400 — use the filters.</p>
       </div>
     </details>
 
@@ -376,11 +378,13 @@
           const profit = sell * (1 - m.fees) - it.jita - haul;
           const pm3 = profit / it.vol;
           const roi = profit / (it.jita + haul);
-          return { it, sell, profit, pm3, roi };
+          const mov = it.mov || 0;
+          const iskday = profit * mov;
+          return { it, sell, profit, pm3, roi, mov, iskday };
         })
-        .sort((a, b) => b.pm3 - a.pm3)
+        .sort((a, b) => b.iskday - a.iskday)
         .slice(0, 400);
-      for (const { it, sell, profit, pm3, roi } of list) {
+      for (const { it, sell, profit, pm3, roi, mov, iskday } of list) {
         const tags = [];
         if (!it.xhq) tags.push('<span class="demandtag d-miss">MISSING</span>');
         if (it.lost) tags.push(`<span class="demandtag d-lost">${it.lost} LOST/30D</span>`);
@@ -396,10 +400,12 @@
           <td class="num" data-v="${it.vol}">${it.vol}</td>
           <td class="num ${pcls}" data-v="${profit}">${isk(profit)}</td>
           <td class="num ${pcls}" data-v="${pm3}">${isk(pm3)}</td>
+          <td class="num" data-v="${mov}">${mov >= 100 ? Math.round(mov).toLocaleString("en-US") : mov}</td>
+          <td class="num ${pcls}" data-v="${iskday}">${isk(iskday)}</td>
           <td class="num ${pcls}" data-v="${isFinite(roi) ? roi : -9}">${isFinite(roi) ? Math.round(roi * 100) + "%" : "—"}</td>
         </tr>`);
       }
-      $("opp-body").innerHTML = rows.join("") || '<tr><td class="left dim" colspan="9">nothing matches</td></tr>';
+      $("opp-body").innerHTML = rows.join("") || '<tr><td class="left dim" colspan="11">nothing matches</td></tr>';
     }
 
     function renderMfg() {
