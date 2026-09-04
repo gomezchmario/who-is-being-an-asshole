@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
   <div class="stars" aria-hidden="true"></div>
@@ -40,9 +40,11 @@
       <div class="fgrid">
         <div class="frow">
           <span class="flabel dim">PRICE</span>
-          <button id="f-min" class="fbtn on" title="Hide orders priced under this many ISK per unit">HIDE &lt;</button>
-          <input type="text" id="min-value" value="1,000,000" spellcheck="false" title="Per-unit ISK floor — accepts 1000000, 1m, 500k…">
-          <span class="dim">ISK / UNIT</span>
+          <button id="f-min" class="fbtn on" title="Hide orders by price">HIDE</button>
+          <button id="min-dir" class="fbtn" title="Flip between hiding below or above the amount">&lt;</button>
+          <input type="text" id="min-value" value="1,000,000" spellcheck="false" title="ISK amount — accepts 1000000, 1m, 500k…">
+          <span class="dim">ISK /</span>
+          <button id="min-mode" class="fbtn" title="Judge by per-unit price, or by the order's total value (price × qty)">UNIT</button>
           <span class="sep dim">│</span>
           <span class="flabel dim">AMOUNT</span>
           <button id="f-qty" class="fbtn" title="Hide orders by remaining quantity">HIDE QTY</button>
@@ -107,7 +109,7 @@
   </main>
 
   <script data-goatcounter="https://xhq7v.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
-  <script src="visitors.js?v=12"></script>
-  <script src="app.js?v=12"></script>
+  <script src="visitors.js?v=13"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

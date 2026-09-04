@@ -31,7 +31,7 @@
     modules: new Set([7, 32]), // modules, rigs, subsystems
     fit: new Set([6, 7, 8, 18, 32, 87]), // union: "everything else" is the complement
   };
-  const filters = { min: true, qty: false, qtyDir: "<", cat: "all" };
+  const filters = { min: true, minDir: "<", minMode: "unit", qty: false, qtyDir: "<", cat: "all" };
   const vFilter = new Set(); // empty = show every verdict
   let touched = false; // table stays empty until the visitor picks a filter
 
@@ -50,7 +50,11 @@
   function passesFilters(o) {
     const q = $("search").value.trim().toLowerCase();
     if (q && !(o.name || "").toLowerCase().includes(q)) return false;
-    if (filters.min && o.price < minValue()) return false;
+    if (filters.min) {
+      const basis = filters.minMode === "unit" ? o.price : o.price * o.volume;
+      const x = minValue();
+      if (filters.minDir === "<" ? basis < x : basis > x) return false;
+    }
     if (filters.qty) {
       const x = parseAmt("qty-value", 10);
       if (filters.qtyDir === "<" ? o.volume < x : o.volume > x) return false;
@@ -291,6 +295,16 @@
     });
   }
 
+  $("min-dir").addEventListener("click", () => {
+    filters.minDir = filters.minDir === "<" ? ">" : "<";
+    $("min-dir").innerHTML = filters.minDir === "<" ? "&lt;" : "&gt;";
+    wake();
+  });
+  $("min-mode").addEventListener("click", () => {
+    filters.minMode = filters.minMode === "unit" ? "order" : "unit";
+    $("min-mode").textContent = filters.minMode === "unit" ? "UNIT" : "ORDER";
+    wake();
+  });
   $("f-qty").addEventListener("click", () => {
     filters.qty = !filters.qty;
     $("f-qty").classList.toggle("on", filters.qty);
