@@ -251,10 +251,15 @@
         agg.set(it.id, e);
       }
       const isDrugName = (n) => /Booster$|\sDose\s/.test(n);
-      const loadsOf = (e) => Math.floor(e.q / e.maxQ);
+      // Fighters (cat 87) come in squadrons of 9, so a "load" is 9 fighters
+      // regardless of what any single fit lists.
+      const loadsOf = (e) => Math.floor(e.q / (e.cat === 87 ? 9 : e.maxQ));
+      // Ammo/drones need 3+ loads to count as stocked; fighters need MORE
+      // than 3 squadron-loads.
+      const lowAmmoCheck = (e) => (e.cat === 87 ? loadsOf(e) <= 3 : loadsOf(e) < 3);
       // Under 3 fit-loads of ammo, or under 10 doses of a drug, counts as
       // not available.
-      const lowAmmo = [...agg.values()].filter((e) => [8, 18, 87].includes(e.cat) && loadsOf(e) < 3);
+      const lowAmmo = [...agg.values()].filter((e) => [8, 18, 87].includes(e.cat) && lowAmmoCheck(e));
       const lowDrugs = [...agg.values()].filter((e) => e.cat === 20 && isDrugName(e.name) && e.q < 10);
 
       const ammoList = [
@@ -340,7 +345,7 @@
       };
       const byLoads = (a, b) => loadsOf(a) - loadsOf(b);
       stockedTable("stocked-ammo",
-        [...agg.values()].filter((e) => [8, 18, 87].includes(e.cat) && loadsOf(e) >= 3).sort(byLoads), true);
+        [...agg.values()].filter((e) => [8, 18, 87].includes(e.cat) && !lowAmmoCheck(e)).sort(byLoads), true);
       stockedTable("stocked-implants",
         [...agg.values()].filter((e) => e.cat === 20 && !(isDrugName(e.name) && e.q < 10)).sort((a, b) => a.q - b.q), false);
 
