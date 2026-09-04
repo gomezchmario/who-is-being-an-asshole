@@ -243,8 +243,8 @@ async function main() {
     orders,
   };
   writeFileSync(new URL("../data.json", import.meta.url), JSON.stringify(out));
-  const offenders = orders.filter((o) => o.markup >= 0.2).length;
-  console.log(`Wrote data.json: ${orders.length} sell orders, ${offenders} assholes (>=20% over Jita).`);
+  const offenders = orders.filter((o) => o.markup >= 0.3).length;
+  console.log(`Wrote data.json: ${orders.length} sell orders, ${offenders} assholes (>=30% over Jita).`);
 
   // 6. Contract valuation: price vs summed Jita value of the contents.
   let doctrineShips = new Set();
@@ -361,7 +361,7 @@ async function main() {
     system: "XHQ-7V",
     contracts,
   }));
-  const cOff = contracts.filter((x) => x.markup >= 0.2).length;
+  const cOff = contracts.filter((x) => x.markup >= 0.3).length;
   console.log(`Wrote contracts.json: ${contracts.length} contracts, ${cOff} assholes, ` +
     `${contracts.filter((x) => x.doctrine).length} doctrine-ship, ${contracts.filter((x) => x.scalp).length} scalps.`);
 }

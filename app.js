@@ -83,7 +83,7 @@
 
   function render() {
     if (!data) return;
-    const threshold = Math.max(0, Number($("threshold").value) || 20) / 100;
+    const threshold = Math.max(0, Number($("threshold").value) || 30) / 100;
     const showAll = $("show-all").checked;
     $("threshold-label").textContent = Math.round(threshold * 100);
 

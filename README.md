@@ -1,7 +1,7 @@
 # WHO IS BEING AN ASSHOLE?
 
 A retro-CRT web app that scans the **XHQ-7V** market (Immortalis Fortizar, Providence)
-and names every sell order priced more than **20% above Jita 4-4**.
+and names every sell order priced more than **30% above Jita 4-4**.
 
 - Public page: pure static HTML on GitHub Pages — visitors need no login.
 - Data: a GitHub Actions cron job runs every 30 minutes with an EVE SSO refresh
@@ -59,7 +59,7 @@ EVE_CLIENT_ID=... EVE_CLIENT_SECRET=... EVE_REFRESH_TOKEN=... JANICE_API_KEY=...
 
 | Markup over Jita | Verdict |
 |---|---|
-| below threshold (default 20%) | ░ HONEST |
+| below threshold (default 30%) | ░ HONEST |
 | ≥ threshold | ▒ CHEEKY |
 | ≥ 50% | ▓ ASSHOLE |
 | ≥ 100% | █ GALACTIC ASSHOLE |
