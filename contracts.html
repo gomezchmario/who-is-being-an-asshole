@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WHO IS BEING AN ASSHOLE? — CONTRACTS</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💢</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <div class="crt" aria-hidden="true"></div>
+
+  <main class="terminal">
+    <header>
+      <div class="topline">
+        <span>CONCORD CONTRACT SURVEILLANCE NODE // PROVIDENCE</span>
+        <span id="clock">--:--:--</span>
+      </div>
+      <h1 class="title">WHO IS BEING<br>AN <span class="red glitch">ASSHOLE</span>?</h1>
+      <p class="subtitle">▸ XHQ-7V CONTRACT GOUGING DETECTOR ◂</p>
+      <p class="tagline">public contracts priced &gt;<span id="threshold-label">20</span>% above the Jita value of their contents · <a href="index.html">◂ back to the market</a></p>
+    </header>
+
+    <section class="panel">
+      <div class="row spread wrap">
+        <span id="scan-info" class="dim">ESTABLISHING UPLINK<span class="blink">…</span></span>
+        <span class="controls">
+          <label for="threshold">ASSHOLE THRESHOLD&nbsp;</label>
+          <input type="number" id="threshold" value="20" min="0" max="900" step="5">
+          <span>%</span>
+        </span>
+      </div>
+    </section>
+
+    <section class="panel filters">
+      <div class="frow">
+        <span class="flabel dim">SHOW</span>
+        <button class="fbtn cbtn on" data-cat="all">ALL CONTRACTS</button>
+        <button class="fbtn cbtn doctrine" data-cat="doctrine" title="Contracts containing a CVA doctrine ship hull">DOCTRINE SHIPS</button>
+      </div>
+    </section>
+
+    <section id="status" class="log"></section>
+
+    <section id="results" class="hidden">
+      <div id="summary" class="summary"></div>
+      <div class="tablewrap">
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th class="left sortable" data-key="markup">VERDICT<span class="arrow"></span></th>
+              <th class="left sortable" data-key="title">CONTRACT<span class="arrow"></span></th>
+              <th class="left sortable" data-key="issuer">ISSUER<span class="arrow"></span></th>
+              <th class="num sortable" data-key="price">ASKING<span class="arrow"></span></th>
+              <th class="num sortable" data-key="value">JITA VALUE<span class="arrow"></span></th>
+              <th class="num sortable" data-key="markup">MARKUP<span class="arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </div>
+      <div class="row spread wrap">
+        <p class="dim small">Contracts sign their work. No CONCORD redaction here.</p>
+        <p class="dim small"><label><input type="checkbox" id="show-all"> show honest contracts too</label></p>
+      </div>
+    </section>
+
+    <footer>
+      <p class="credit">▸ Liked this app? Send ISK. Want your own? Contact <span class="amber">Levhitor</span> in-game. ◂</p>
+      <p class="dim small">unofficial · not affiliated with CCP Games · data: EVE ESI + <a href="https://janice.e-351.com/" target="_blank" rel="noopener">Janice</a> · contents valued at Jita 4-4 min sell (galaxy avg fallback) · BPCs valued at 0 (± marked) · auto-updates every ~30 min</p>
+    </footer>
+  </main>
+
+  <script src="contracts.js"></script>
+</body>
+</html>

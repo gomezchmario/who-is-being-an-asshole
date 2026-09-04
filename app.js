@@ -25,13 +25,21 @@
     modules: new Set([7, 32]), // modules, rigs, subsystems
     fit: new Set([6, 7, 8, 18, 32, 87]), // union: "everything else" is the complement
   };
-  const MIN_VALUE = 1_000_000; // per unit
   const filters = { min: true, cat: "all" };
+
+  function minValue() {
+    const raw = ($("min-value").value || "").trim().toLowerCase().replace(/,/g, "");
+    const m = raw.match(/^([\d.]+)\s*([kmb])?$/);
+    if (!m) return 1_000_000;
+    const mult = { k: 1e3, m: 1e6, b: 1e9 }[m[2]] || 1;
+    const v = parseFloat(m[1]) * mult;
+    return Number.isFinite(v) && v >= 0 ? v : 1_000_000;
+  }
   let doctrineTypes = new Set();
   const sort = { key: "markup", dir: -1 };
 
   function passesFilters(o) {
-    if (filters.min && o.price < MIN_VALUE) return false;
+    if (filters.min && o.price < minValue()) return false;
     if (filters.cat === "all") return true;
     if (filters.cat === "doctrine") return doctrineTypes.has(o.type_id);
     if (filters.cat === "caps") return !!o.capital;
@@ -224,6 +232,7 @@
     });
   }
 
+  $("min-value").addEventListener("input", render);
   $("threshold").addEventListener("input", render);
   $("show-all").addEventListener("change", render);
   load();

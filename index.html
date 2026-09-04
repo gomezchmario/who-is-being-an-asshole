@@ -22,7 +22,7 @@
       </div>
       <h1 class="title">WHO IS BEING<br>AN <span class="red glitch">ASSHOLE</span>?</h1>
       <p class="subtitle">▸ XHQ-7V PRICE GOUGING DETECTOR ◂</p>
-      <p class="tagline" id="tagline">flagging sell orders priced &gt;<span id="threshold-label">20</span>% above Jita 4-4</p>
+      <p class="tagline" id="tagline">flagging sell orders priced &gt;<span id="threshold-label">20</span>% above Jita 4-4 · <a href="contracts.html">contracts ▸</a></p>
     </header>
 
     <section class="panel">
@@ -39,7 +39,9 @@
     <section class="panel filters">
       <div class="frow">
         <span class="flabel dim">PRICE</span>
-        <button id="f-min" class="fbtn on" title="Hide orders priced under 1,000,000 ISK per unit">HIDE &lt; 1M ISK</button>
+        <button id="f-min" class="fbtn on" title="Hide orders priced under this many ISK per unit">HIDE &lt;</button>
+        <input type="text" id="min-value" value="1,000,000" spellcheck="false" title="Per-unit ISK floor — accepts 1000000, 1m, 500k…">
+        <span class="dim">ISK / UNIT</span>
       </div>
       <div class="frow">
         <span class="flabel dim">SHOW</span>

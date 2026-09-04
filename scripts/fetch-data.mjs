@@ -111,9 +111,38 @@ async function main() {
   console.log(`Structures: ${JSON.stringify(structures)}`);
   console.log(`Sell orders found: ${sells.length}`);
 
+  // 2b. Outstanding public contracts starting at our structures. Contract
+  //     contents are immutable, so they're cached in contract-items.json and
+  //     only new contract ids are fetched each run.
+  const contractsRaw = [];
+  {
+    const all = await fetchPaginated(`${ESI}/contracts/public/${REGION_ID}/`);
+    for (const c of all.items) {
+      if (structureIds.has(c.start_location_id) && c.type === "item_exchange") contractsRaw.push(c);
+    }
+  }
+  const itemsCacheFile = new URL("../contract-items.json", import.meta.url);
+  let itemsCache = {};
+  try { itemsCache = JSON.parse(readFileSync(itemsCacheFile, "utf8")); } catch {}
+  const newContracts = contractsRaw.filter((c) => itemsCache[c.contract_id] == null);
+  await inBatches(newContracts, 15, async (c) => {
+    const res = await esiJson(`${ESI}/contracts/public/items/${c.contract_id}/`);
+    if (res.error) { itemsCache[c.contract_id] = []; return; }
+    // [type_id, quantity, included(1/0), bpc(1/0)]
+    itemsCache[c.contract_id] = (res.json || []).map((i) => [
+      i.type_id, i.quantity, i.is_included ? 1 : 0, i.is_blueprint_copy ? 1 : 0,
+    ]);
+  });
+  // Prune expired/completed contracts from the cache.
+  const liveIds = new Set(contractsRaw.map((c) => String(c.contract_id)));
+  for (const k of Object.keys(itemsCache)) if (!liveIds.has(k)) delete itemsCache[k];
+  writeFileSync(itemsCacheFile, JSON.stringify(itemsCache));
+  console.log(`Contracts at structures: ${contractsRaw.length} (${newContracts.length} newly fetched).`);
+
   // 3. Jita reference prices from Janice (min sell at Jita 4-4, falling
   //    back to the 5-day median sell when Jita is momentarily out of stock).
-  const typeIds = [...new Set(sells.map((o) => o.type_id))];
+  const contractTypeIds = Object.values(itemsCache).flatMap((items) => items.map((i) => i[0]));
+  const typeIds = [...new Set([...sells.map((o) => o.type_id), ...contractTypeIds])];
   const jita = {};
   for (let i = 0; i < typeIds.length; i += 500) {
     const chunk = typeIds.slice(i, i + 500);
@@ -167,10 +196,12 @@ async function main() {
     }
   }
 
-  // 4. Type names.
+  // 4. Type and issuer names (one endpoint handles both).
   const names = {};
-  for (let i = 0; i < typeIds.length; i += 900) {
-    const chunk = typeIds.slice(i, i + 900);
+  const issuerIds = [...new Set(contractsRaw.map((c) => c.issuer_id))];
+  const allIds = [...typeIds, ...issuerIds];
+  for (let i = 0; i < allIds.length; i += 900) {
+    const chunk = allIds.slice(i, i + 900);
     const res = await esiJson(`${ESI}/universe/names/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -211,6 +242,51 @@ async function main() {
   writeFileSync(new URL("../data.json", import.meta.url), JSON.stringify(out));
   const offenders = orders.filter((o) => o.markup >= 0.2).length;
   console.log(`Wrote data.json: ${orders.length} sell orders, ${offenders} assholes (>=20% over Jita).`);
+
+  // 6. Contract valuation: price vs summed Jita value of the contents.
+  let doctrineShips = new Set();
+  try {
+    const d = JSON.parse(readFileSync(new URL("../doctrine-items.json", import.meta.url), "utf8"));
+    doctrineShips = new Set(d.types.filter((t) => catCache[t]?.[1] === 6));
+  } catch {}
+  const refPrice = (tid) => jita[tid] ?? galaxy[tid] ?? null;
+  const contracts = contractsRaw.map((c) => {
+    const items = itemsCache[c.contract_id] || [];
+    const included = items.filter((i) => i[2]);
+    let value = 0, unpriced = 0, hull = null, hullValue = -1, doctrine = 0;
+    for (const [tid, qty, , bpc] of included) {
+      const p = bpc ? null : refPrice(tid);
+      if (p == null) { unpriced++; continue; }
+      value += p * qty;
+      if (catCache[tid]?.[1] === 6 && p * qty > hullValue) { hullValue = p * qty; hull = tid; }
+      if (doctrineShips.has(tid)) doctrine = 1;
+    }
+    const swap = items.some((i) => !i[2]);
+    const markup = !swap && value > 0 ? c.price / value - 1 : null;
+    return {
+      id: c.contract_id,
+      title: c.title || "",
+      issuer: names[c.issuer_id] || String(c.issuer_id),
+      price: c.price,
+      value: value || null,
+      markup,
+      items: included.reduce((s, i) => s + i[1], 0),
+      hull: hull ? names[hull] : null,
+      hull_id: hull,
+      expires: c.date_expired,
+      ...(doctrine && { doctrine: 1 }),
+      ...(unpriced && { est: 1 }),
+      ...(swap && { swap: 1 }),
+    };
+  });
+  contracts.sort((a, b) => (b.markup ?? -Infinity) - (a.markup ?? -Infinity));
+  writeFileSync(new URL("../contracts.json", import.meta.url), JSON.stringify({
+    generated: new Date().toISOString(),
+    system: "XHQ-7V",
+    contracts,
+  }));
+  const cOff = contracts.filter((x) => x.markup >= 0.2).length;
+  console.log(`Wrote contracts.json: ${contracts.length} contracts, ${cOff} assholes, ${contracts.filter((x) => x.doctrine).length} doctrine-ship contracts.`);
 }
 
 main().catch((e) => {
