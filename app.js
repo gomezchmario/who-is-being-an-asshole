@@ -22,7 +22,8 @@
   const CATS = {
     ammo: new Set([8, 18]),
     ships: new Set([6]),
-    fit: new Set([6, 7, 8, 18, 32, 87]),
+    modules: new Set([7, 32]), // modules, rigs, subsystems
+    fit: new Set([6, 7, 8, 18, 32, 87]), // union: "everything else" is the complement
   };
   const MIN_VALUE = 1_000_000;
   const filters = { min: true, cat: "all" };
