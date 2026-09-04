@@ -267,6 +267,17 @@ footer {
   padding-top: 8px;
 }
 
+.credit {
+  font-family: "VT323", monospace;
+  font-size: 22px;
+  color: var(--phosphor);
+  margin: 6px 0 10px;
+}
+.amber {
+  color: var(--amber);
+  text-shadow: 0 0 8px rgba(255, 176, 0, 0.5);
+}
+
 @media (max-width: 640px) {
   .title { margin-top: 18px; }
   .subtitle { letter-spacing: 0.18em; }

@@ -20,7 +20,7 @@
   // EVE inventory category ids: 6 Ship, 7 Module, 8 Charge (ammo), 18 Drone,
   // 32 Subsystem, 87 Fighter.
   const CATS = {
-    ammo: new Set([8, 18]),
+    ammo: new Set([8, 18, 87]), // charges, drones, fighters
     ships: new Set([6]),
     modules: new Set([7, 32]), // modules, rigs, subsystems
     fit: new Set([6, 7, 8, 18, 32, 87]), // union: "everything else" is the complement
