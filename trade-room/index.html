@@ -344,10 +344,11 @@
 
     function renderMfg() {
       const m = model();
-      const T2RE = /\bII\b/;
+      // T2 ammo carries no "II" — recognize the T2 charge families by name.
+      const T2RE = /\bII\b|Barrage|Hail|Quake|Tremor|Javelin|Spike|Null|Void|Scorch|Conflagration|Aurora|Gleam|Occult|Mystic|Baryon|Tetryon|Meson|Fury|Rage|Precision [SML]|ElectroPunch|GalvaSurge|SlamBolt|StrikeSnipe|Polarized/;
       const FACTION = /Navy|Fleet|Imperial|Republic|Federation|Caldari|Dread|Arch |Guristas|Sanshas|True |Shadow|Domination|'/;
       const cands = (data.items || [])
-        .filter((it) => [8, 18].includes(it.cat) && it.jita != null)
+        .filter((it) => [8, 18].includes(it.cat) && it.jita != null && !FACTION.test(it.name))
         .map((it) => {
           const missing = !it.xhq;
           const markup = it.xhq && it.jita ? it.xhq.min / it.jita - 1 : null;
@@ -358,9 +359,7 @@
         .slice(0, 30);
       $("mfg-body").innerHTML = cands.map(({ it, missing, markup }) => {
         const t2 = T2RE.test(it.name);
-        const faction = FACTION.test(it.name);
-        const setup = faction ? '<span class="dim">LP store / import only — not buildable</span>'
-          : t2 ? '<span class="d-low demandtag">T2</span> <span class="dim">invention line needed</span>'
+        const setup = t2 ? '<span class="d-low demandtag">T2</span> <span class="dim">invention line needed</span>'
           : '<span class="ok-inline" style="color:var(--phosphor)">T1 — BPO + minerals, running in a day</span>';
         return `<tr>
           <td class="left">${esc(it.name)}</td>
