@@ -15,12 +15,12 @@
     details.doctrine > summary {
       cursor: pointer; list-style: none; padding: 10px 14px;
       font-family: "VT323", monospace; font-size: 22px; letter-spacing: 0.04em;
-      display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+      display: flex; justify-content: flex-start; gap: 10px; flex-wrap: wrap;
     }
     details.doctrine > summary::before { content: "▸ "; color: var(--amber); }
     details.doctrine[open] > summary::before { content: "▾ "; }
     details.doctrine > summary:hover { background: rgba(51, 255, 102, 0.06); }
-    summary .dstats { font-family: "Share Tech Mono", monospace; font-size: 13px; color: var(--phosphor-dim); align-self: center; }
+    summary .dstats { font-family: "Share Tech Mono", monospace; font-size: 13px; color: var(--phosphor-dim); align-self: center; margin-left: auto; }
     .fitblock { border-top: 1px dashed var(--phosphor-faint); padding: 10px 14px; position: relative; }
     .fitstat { position: absolute; top: 10px; right: 14px; display: flex; gap: 6px; }
     .fitstat span {
@@ -403,11 +403,11 @@
         // Hulls with neither XHQ market stock nor a single contract.
         const noShip = new Set();
         for (const f of d.fits) if (!f.hullMkt && !f.hullCon) noShip.add(f.hullName || f.hull);
-        const shipsPart = noShip.size
-          ? `<span style="color:var(--red)">${noShip.size} ship${noShip.size > 1 ? "s" : ""} unavailable</span> · `
-          : "";
-        const stats = `${d.fits.length} fits · ` + shipsPart + (totalMissing
-          ? `<span style="color:var(--red)">${totalMissing} items unavailable</span>`
+        const missParts = [];
+        if (noShip.size) missParts.push(`${noShip.size} ship${noShip.size > 1 ? "s" : ""}`);
+        if (totalMissing) missParts.push(`${totalMissing} items`);
+        const stats = `${d.fits.length} fits · ` + (missParts.length
+          ? `<span style="color:var(--red)">${missParts.join(" · ")} unavailable</span>`
           : `<span class="ok-inline">all buyable in XHQ</span>`);
         return `<details class="doctrine"${i < 3 ? " open" : ""}>
           <summary>${esc(d.name)} <span class="dstats">${stats}</span></summary>
