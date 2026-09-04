@@ -21,7 +21,15 @@
     details.doctrine[open] > summary::before { content: "▾ "; }
     details.doctrine > summary:hover { background: rgba(51, 255, 102, 0.06); }
     summary .dstats { font-family: "Share Tech Mono", monospace; font-size: 13px; color: var(--phosphor-dim); align-self: center; }
-    .fitblock { border-top: 1px dashed var(--phosphor-faint); padding: 10px 14px; }
+    .fitblock { border-top: 1px dashed var(--phosphor-faint); padding: 10px 14px; position: relative; }
+    .fitstat { position: absolute; top: 10px; right: 14px; display: flex; gap: 6px; }
+    .fitstat span {
+      font-size: 11px; padding: 1px 6px; border: 1px solid; letter-spacing: 0.05em;
+      cursor: default;
+    }
+    .fitstat .g { color: var(--phosphor); border-color: var(--phosphor-dim); box-shadow: 0 0 6px rgba(51, 255, 102, 0.4); }
+    .fitstat .y { color: var(--amber); border-color: var(--amber); box-shadow: 0 0 6px rgba(255, 176, 0, 0.4); }
+    .fitstat .r { color: var(--red); border-color: var(--red); box-shadow: 0 0 6px rgba(255, 59, 59, 0.4); }
     .fitname { color: var(--phosphor); font-size: 15px; }
     .fitline { font-size: 13px; color: var(--phosphor-dim); margin: 3px 0; }
     .fitline b { color: var(--phosphor); }
@@ -78,6 +86,7 @@
     <section id="doctrines"></section>
 
     <footer>
+      <p class="credit">▸ Liked this app? Send ISK. Want your own? Contact <span class="amber">Levhitor</span> in-game. ◂</p>
       <p class="dim small">unlisted · data: EVE ESI + Janice (Jita 4-4 &amp; Amarr min sell) · XHQ = Immortalis Fortizar market/contracts · auto-updates every ~30 min</p>
     </footer>
   </main>
@@ -169,8 +178,16 @@
       const markupLine = (vsJita || vsAmarr)
         ? `<div class="fitline">XHQ MARKUP: ${vsJita ? `vs JITA ${vsJita}` : ""}${vsJita && vsAmarr ? " · " : ""}${vsAmarr ? `vs AMARR ${vsAmarr}` : ""}${f.xhqPartial ? ' <span class="dim">(available items only)</span>' : ""}</div>`
         : "";
+      const mktState = !f.hullMkt ? ["r", "no hull on the XHQ market"]
+        : f.missing.length ? ["y", "hull on market, but some fit items are missing"]
+        : ["g", "full fit buyable on the XHQ market"];
+      const conState = f.hullCon ? ["g", "contracts available for this hull"] : ["r", "no contracts for this hull"];
       return `
         <div class="fitblock">
+          <div class="fitstat">
+            <span class="${mktState[0]}" title="MARKET — ${mktState[1]}">MKT</span>
+            <span class="${conState[0]}" title="CONTRACTS — ${conState[1]}">CON</span>
+          </div>
           <div class="fitname">${esc(f.t || f.hullName || "fit")}</div>
           <div class="fitline">HULL ${esc(f.hullName || "?")}: ${hullMkt} · ${hullCon}</div>
           <div class="fitline costs">
