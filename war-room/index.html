@@ -157,12 +157,12 @@
       const fitItems = f.items.filter((it) => !isImp(it));
       const impItems = f.items.filter(isImp);
 
+      // How many complete fits the market can supply right now.
+      const kits = Math.min(...fitItems.map((it) => Math.floor((it.mkt?.q || 0) / it.qty)));
       let miss;
       if (missFit.length) {
         miss = `<div class="missline">MISSING FROM XHQ MARKET: ${missFit.map((m) => esc(m.name) + (m.qty > 1 ? " ×" + m.qty : "")).join(", ")}</div>`;
       } else {
-        // How many complete fits the market can supply right now.
-        const kits = Math.min(...fitItems.map((it) => Math.floor((it.mkt?.q || 0) / it.qty)));
         miss = kits >= 1
           ? `<div class="fitline ok-inline">✓ full fit available on XHQ market — stock for <b>${kits}</b> complete fit${kits > 1 ? "s" : ""}</div>`
           : `<div class="fitline" style="color:var(--amber)">◑ all items on market, but not enough stock for one complete fit</div>`;
@@ -198,7 +198,8 @@
         ? `<div class="fitline">XHQ MARKUP: ${vsJita ? `vs JITA ${vsJita}` : ""}${vsJita && vsAmarr ? " · " : ""}${vsAmarr ? `vs AMARR ${vsAmarr}` : ""}${f.xhqPartial ? ' <span class="dim">(available items only)</span>' : ""}</div>`
         : "";
       const mktState = !f.hullMkt ? ["r", "no hull on the XHQ market"]
-        : f.missing.some((m) => m.cat !== 20) ? ["y", "hull on market, but some fit items are missing"]
+        : missFit.length ? ["y", "hull on market, but some fit items are missing"]
+        : kits < 1 ? ["y", "all items on market, but not enough stock for a complete fit"]
         : ["g", "full fit buyable on the XHQ market"];
       const conState = f.hullCon ? ["g", "contracts available for this hull"] : ["r", "no contracts for this hull"];
       return `
