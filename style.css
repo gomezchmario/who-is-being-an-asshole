@@ -220,6 +220,29 @@ input[type="checkbox"] { accent-color: var(--phosphor-dim); }
   box-shadow: 0 0 10px rgba(255, 176, 0, 0.45);
 }
 
+.fgrid { width: max-content; max-width: 100%; }
+
+.contracts-btn {
+  margin-left: auto;
+  font-family: "VT323", monospace;
+  font-size: 21px;
+  line-height: 1;
+  padding: 5px 14px 6px;
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  text-decoration: none;
+  text-shadow: 0 0 8px rgba(255, 176, 0, 0.5);
+  box-shadow: 0 0 10px rgba(255, 176, 0, 0.2);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.contracts-btn:hover {
+  background: var(--amber);
+  color: #1c1000;
+  text-shadow: none;
+  box-shadow: 0 0 14px rgba(255, 176, 0, 0.5);
+}
+
 /* --- status log --- */
 .log {
   font-size: 14px;
