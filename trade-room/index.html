@@ -222,7 +222,9 @@
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
             <span class="flabel dim">VIEW</span>
-            <button id="ilp-kind" class="fbtn" data-kind="implants" title="Cycle: implants only → drugs only → both">IMPLANTS</button>
+            <button class="fbtn kind-btn on" data-kind="implants" title="Permanent cybernetics only">IMPLANTS</button>
+            <button class="fbtn kind-btn" data-kind="drugs" title="Temporary boosters/doses only">DRUGS</button>
+            <button class="fbtn kind-btn" data-kind="all" title="Implants and drugs together">BOTH</button>
             <button id="ilp-scope" class="fbtn" title="Include every destroyed implant or drug, not just ones used in a tracked doctrine set/hardwiring — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
             <button id="ilp-all" class="fbtn" title="Show everything lost — clears the HIDE thresholds">CLEAR FILTERS</button>
             <button id="ilp-mode" class="fbtn" title="Group implants by set (grade + slot), hardwirings, and drugs separately, like the war room's missing-implants list">GROUP BY SET</button>
@@ -605,7 +607,6 @@
     const modState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true };
     const ammoState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true };
     const impState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true, kind: "implants" };
-    const IMP_KIND_CYCLE = ["implants", "drugs", "all"];
     const ilAmmoState = { grouped: false };
     const ilImpState = { grouped: false };
 
@@ -1013,12 +1014,13 @@
       $("ilp-mode").classList.toggle("on", ilImpState.grouped);
       renderImpTable();
     });
-    const IMP_KIND_LABELS = { implants: "IMPLANTS", drugs: "DRUGS", all: "BOTH" };
-    $("ilp-kind").addEventListener("click", () => {
-      impState.kind = IMP_KIND_CYCLE[(IMP_KIND_CYCLE.indexOf(impState.kind) + 1) % IMP_KIND_CYCLE.length];
-      $("ilp-kind").textContent = IMP_KIND_LABELS[impState.kind];
-      renderImpTable();
-    });
+    for (const b of document.querySelectorAll(".kind-btn")) {
+      b.addEventListener("click", () => {
+        impState.kind = b.dataset.kind;
+        for (const x of document.querySelectorAll(".kind-btn")) x.classList.toggle("on", x === b);
+        renderImpTable();
+      });
+    }
     $("opp-scope").addEventListener("click", () => {
       oppTouch();
       oppState.whole = !oppState.whole;
