@@ -109,7 +109,7 @@
 
     <!-- LOSSES -->
     <details class="doctrine" open>
-      <summary>DOCTRINE SHIPS DYING (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
+      <summary>DOCTRINE SHIPS DYING (LAST 45 DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
@@ -131,7 +131,7 @@
         <div class="tablewrap"><table class="tr-table" id="loss-table">
           <thead><tr>
             <th class="left sortable">SHIP<span class="arrow"></span></th>
-            <th class="num sortable">LOST / 30D<span class="arrow"></span></th>
+            <th class="num sortable">LOST / 45D<span class="arrow"></span></th>
             <th class="num sortable">XHQ HULLS<span class="arrow"></span></th>
             <th class="num sortable">CONTRACTS<span class="arrow"></span></th>
             <th class="num sortable" title="(market hulls + contracts) / losses per month">MONTHS OF STOCK<span class="arrow"></span></th>
@@ -144,7 +144,7 @@
 
     <!-- MODULE LOSSES -->
     <details class="doctrine" open>
-      <summary>DOCTRINE MODULES BEING DESTROYED (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
+      <summary>DOCTRINE MODULES BEING DESTROYED (LAST 45 DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
@@ -167,7 +167,7 @@
         <div class="tablewrap"><table class="tr-table" id="il-mod-table">
           <thead><tr>
             <th class="left">ITEM</th>
-            <th class="num">LOST / 30D</th>
+            <th class="num">LOST / 45D</th>
             <th class="num">XHQ STOCK</th>
             <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
           </tr></thead>
@@ -180,7 +180,7 @@
 
     <!-- AMMO / DRONE LOSSES -->
     <details class="doctrine">
-      <summary>AMMO + DRONES BEING DESTROYED (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
+      <summary>AMMO + DRONES BEING DESTROYED (LAST 45 DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
@@ -204,7 +204,7 @@
         <div class="tablewrap"><table class="tr-table" id="il-ammo-table">
           <thead><tr>
             <th class="left">ITEM</th>
-            <th class="num">LOST / 30D</th>
+            <th class="num">LOST / 45D</th>
             <th class="num">XHQ STOCK</th>
             <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
           </tr></thead>
@@ -217,7 +217,7 @@
 
     <!-- IMPLANT LOSSES -->
     <details class="doctrine">
-      <summary>IMPLANTS &amp; DRUGS BEING DESTROYED (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
+      <summary>IMPLANTS &amp; DRUGS BEING DESTROYED (LAST 45 DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
@@ -242,7 +242,7 @@
         <div class="tablewrap"><table class="tr-table" id="il-imp-table">
           <thead><tr>
             <th class="left">ITEM</th>
-            <th class="num">LOST / 30D</th>
+            <th class="num">LOST / 45D</th>
             <th class="num">XHQ STOCK</th>
             <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
           </tr></thead>
@@ -526,7 +526,7 @@
       const entries = (data.losses || []).filter((l) => l.doctrine).map((l) => {
         const hulls = stockOf.get(l.id) || 0;
         const cons = conByHull.get(l.id) || 0;
-        const months = l.n ? (hulls + cons) / l.n : Infinity;
+        const months = l.n ? (hulls + cons) / monthlyRate(l.n) : Infinity;
         return { id: l.id, name: l.name, n: l.n, hulls, cons, months };
       });
 
@@ -585,6 +585,13 @@
       });
     }
 
+    // Loss counts come off a rolling 45-day zKillboard window (see
+    // fetch-data.mjs), not a calendar month — this converts a raw count into
+    // a monthly rate so "months of stock" stays a real calendar month
+    // regardless of how wide that tracking window is.
+    const LOSS_WINDOW_DAYS = 45;
+    const monthlyRate = (n) => n * (30 / LOSS_WINDOW_DAYS);
+
     const CATSETS = {
       ammo: new Set([8, 18, 87]),
       mods: new Set([7, 32]),
@@ -641,7 +648,7 @@
         .filter((l) => cats.has(l.cat) && (state.scope === "all" || l.doctrine) && extra(l))
         .map((l) => {
           const stock = stockOf.get(l.id) || 0;
-          const months = l.n ? stock / l.n : Infinity;
+          const months = l.n ? stock / monthlyRate(l.n) : Infinity;
           return { id: l.id, name: l.name, n: l.n, cat: l.cat, stock, months };
         });
       if (!state.touched) return entries.sort((a, b) => b.n - a.n).slice(0, 10);
@@ -777,7 +784,7 @@
       for (const { it, sell, profit, pm3, roi, mov, iskday } of shown) {
         const tags = [];
         if (!it.xhq) tags.push('<span class="demandtag d-miss">MISSING</span>');
-        if (it.lost) tags.push(`<span class="demandtag d-lost">${it.lost} LOST/30D</span>`);
+        if (it.lost) tags.push(`<span class="demandtag d-lost">${it.lost} LOST/45D</span>`);
         if (it.fits) tags.push(`<span class="demandtag d-fit">${it.fits} FIT${it.fits > 1 ? "S" : ""}</span>`);
         if (it.ind) tags.push('<span class="demandtag d-low">INDUSTRY</span>');
         const pcls = profit > 0 ? "profit-pos" : "profit-neg";
@@ -906,7 +913,7 @@
       renderBuys();
       renderMfg();
       const totalLost = (data.losses || []).filter((l) => l.doctrine).reduce((s, l) => s + l.n, 0);
-      $("scan-info").innerHTML = `LAST SCAN: <b>${age(data.generated)}</b> · SYSTEM: <b>${esc(data.system)}</b> · ${data.items.length} tracked types · ${totalLost} doctrine hulls lost in 30d`;
+      $("scan-info").innerHTML = `LAST SCAN: <b>${age(data.generated)}</b> · SYSTEM: <b>${esc(data.system)}</b> · ${data.items.length} tracked types · ${totalLost} doctrine hulls lost in 45d`;
     }
 
     Promise.all([

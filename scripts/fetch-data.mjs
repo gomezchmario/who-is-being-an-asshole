@@ -578,7 +578,7 @@ async function main() {
     }));
     console.log(`Wrote readiness.json: ${doctrines.length} doctrines.`);
 
-    // 8. Trade room: alliance losses from zKillboard (30 days, cached) +
+    // 8. Trade room: alliance losses from zKillboard (45 days, cached) +
     //    consolidated per-type supply data. Each cached kill also keeps its
     //    victim's fitted/cargo item breakdown, so destroyed modules and
     //    ammo/drones can be tallied the same way as hull losses.
@@ -598,8 +598,9 @@ async function main() {
       const raw = JSON.parse(readFileSync(zkFile, "utf8"));
       if (raw.v === ZK_CACHE_VERSION) zk = raw.kills || {};
     } catch {}
-    const cutoff = Date.now() - 30 * 86400e3;
-    const hardCutoff = Date.now() - 35 * 86400e3;
+    const LOSS_WINDOW_DAYS = 45;
+    const cutoff = Date.now() - LOSS_WINDOW_DAYS * 86400e3;
+    const hardCutoff = Date.now() - (LOSS_WINDOW_DAYS + 5) * 86400e3;
     for (const aid of Object.keys(ALLIANCES)) {
       pages: for (let p = 1; p <= 8; p++) {
         let page;
@@ -736,7 +737,7 @@ async function main() {
       buys: buyList,
       rbuys: rbuyList,
     }));
-    console.log(`Wrote trade.json: ${tradeItems.length} types, ${losses.length} ship loss types (${Object.values(lossCount).reduce((a, b) => a + b, 0)} losses/30d), ${itemLosses.length} destroyed item types (${Object.values(itemLossCount).reduce((a, b) => a + b, 0)} units/30d), ${buyList.length} buy-order types.`);
+    console.log(`Wrote trade.json: ${tradeItems.length} types, ${losses.length} ship loss types (${Object.values(lossCount).reduce((a, b) => a + b, 0)} losses/${LOSS_WINDOW_DAYS}d), ${itemLosses.length} destroyed item types (${Object.values(itemLossCount).reduce((a, b) => a + b, 0)} units/${LOSS_WINDOW_DAYS}d), ${buyList.length} buy-order types.`);
   }
 }
 

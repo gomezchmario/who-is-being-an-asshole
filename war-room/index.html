@@ -123,7 +123,7 @@
     }
 
     let conByHull = new Map(); // hull type_id -> contracts, filled from contracts.json
-    const lossOf = new Map();  // hull type_id -> losses last 30d, from trade.json
+    const lossOf = new Map();  // hull type_id -> losses last 45d, from trade.json
 
     function contractRows(hullId) {
       const cons = conByHull.get(hullId) || [];
@@ -163,7 +163,7 @@
         : `<span class="missline">no contracts</span>`;
       const lost = lossOf.get(f.hull);
       const lostPart = lost
-        ? ` · <span style="color:#c86bff" title="CVA + CVAA losses of this hull, last 30 days (zKillboard)"><b style="color:#c86bff">${lost}</b> lost/30d</span>`
+        ? ` · <span style="color:#c86bff" title="CVA + CVAA losses of this hull, last 45 days (zKillboard)"><b style="color:#c86bff">${lost}</b> lost/45d</span>`
         : "";
       // Implants & boosters (cat 20) are judged separately from the fit itself.
       const isImp = (x) => x.cat === 20;
