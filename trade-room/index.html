@@ -185,6 +185,26 @@
       </div>
     </details>
 
+    <!-- BUY ORDER BOUNTIES -->
+    <details class="doctrine" open>
+      <summary>BUY ORDER BOUNTIES — FILL XHQ BUY ORDERS FOR PROFIT</summary>
+      <div class="inner">
+        <div class="tablewrap"><table class="tr-table" id="buy-table">
+          <thead><tr>
+            <th class="left sortable">ITEM<span class="arrow"></span></th>
+            <th class="num sortable">BUY @<span class="arrow"></span></th>
+            <th class="num sortable" title="Remaining quantity on the best buy order (total demand across all buy orders in parentheses)">WANTED<span class="arrow"></span></th>
+            <th class="left sortable">BEST SOURCE<span class="arrow"></span></th>
+            <th class="num sortable" title="Source price plus hauling for remote sources">COST/U<span class="arrow"></span></th>
+            <th class="num sortable" title="Buy price after sales tax, minus cost">PROFIT/U<span class="arrow"></span></th>
+            <th class="num sortable" title="Profit × the best order's remaining quantity">TOTAL<span class="arrow"></span></th>
+          </tr></thead>
+          <tbody id="buy-body"></tbody>
+        </table></div>
+        <p class="note" style="margin-bottom:0">Standing buy orders across the system's structures, matched against the cheapest way to fill them — XHQ's own sell orders (no hauling) or Jita/Amarr plus your haul rate. Filling a buy order pays sales tax but no broker fee. Only profitable fills shown.</p>
+      </div>
+    </details>
+
     <!-- MANUFACTURING -->
     <details class="doctrine">
       <summary>MANUFACTURING IDEAS — CHEAP TO SET UP</summary>
@@ -469,6 +489,43 @@
       $("opp-body").innerHTML = rows.join("") || '<tr><td class="left dim" colspan="8">nothing matches</td></tr>';
     }
 
+    // Buy orders across XHQ structures vs the cheapest way to fill them.
+    function renderBuys() {
+      const m = model();
+      const tax = num($("p-tax").value, 4.48) / 100;
+      const byId = new Map((data.items || []).map((i) => [i.id, i]));
+      const rows = (data.buys || [])
+        .map((b) => {
+          const it = byId.get(b.id);
+          if (!it || it.vol == null) return null;
+          const haul = it.vol * m.haul;
+          const cands = [];
+          if (it.xhq) cands.push(["XHQ", it.xhq.min]);
+          if (it.jita != null) cands.push(["JITA", it.jita + haul]);
+          if (it.amarr != null) cands.push(["AMARR", it.amarr + haul]);
+          if (!cands.length) return null;
+          cands.sort((a, c) => a[1] - c[1]);
+          const [src, cost] = cands[0];
+          const profit = b.p * (1 - tax) - cost;
+          const total = profit * b.q;
+          return { it, b, src, cost, profit, total };
+        })
+        .filter((x) => x && x.profit > 0)
+        .sort((a, c) => c.total - a.total)
+        .slice(0, 50);
+      $("buy-body").innerHTML = rows.map(({ it, b, src, cost, profit, total }) => `
+        <tr>
+          <td class="left" data-v="${esc(it.name)}">${esc(it.name)}<span class="struct">${it.vol} m³ · total demand ${b.tq.toLocaleString("en-US")}</span></td>
+          <td class="num" data-v="${b.p}">${isk(b.p)}</td>
+          <td class="num" data-v="${b.q}">${b.q.toLocaleString("en-US")}${b.tq > b.q ? ` <span class="dim">(${b.tq.toLocaleString("en-US")})</span>` : ""}</td>
+          <td class="left" data-v="${src}">${src === "XHQ" ? '<span class="ok-inline" style="color:var(--phosphor)">XHQ (no haul)</span>' : `<span class="d-low demandtag">${src}</span>`}</td>
+          <td class="num" data-v="${cost}">${isk(cost)}</td>
+          <td class="num profit-pos" data-v="${profit}">${isk(profit)}</td>
+          <td class="num profit-pos" data-v="${total}">${isk(total)}</td>
+        </tr>`).join("") ||
+        '<tr><td class="left dim" colspan="7">no profitable buy orders right now — the fort\'s buyers are stingy</td></tr>';
+    }
+
     function renderMfg() {
       const m = model();
       // T2 ammo carries no "II" — recognize the T2 charge families by name.
@@ -501,6 +558,7 @@
       if (!data) return;
       renderLosses();
       renderOpps();
+      renderBuys();
       renderMfg();
       const totalLost = (data.losses || []).filter((l) => l.doctrine).reduce((s, l) => s + l.n, 0);
       $("scan-info").innerHTML = `LAST SCAN: <b>${age(data.generated)}</b> · SYSTEM: <b>${esc(data.system)}</b> · ${data.items.length} tracked types · ${totalLost} doctrine hulls lost in 30d`;
@@ -521,7 +579,7 @@
       $("scan-info").textContent = "AWAITING FIRST SCAN";
     });
 
-    for (const k of PKEYS) $(k).addEventListener("input", () => { saveParams(); renderOpps(); });
+    for (const k of PKEYS) $(k).addEventListener("input", () => { saveParams(); renderOpps(); renderBuys(); });
     for (const b of document.querySelectorAll(".cbtn")) {
       b.addEventListener("click", () => {
         oppTouch();
@@ -554,6 +612,7 @@
     });
     $("q").addEventListener("input", () => { oppTouch(); filter.q = $("q").value.trim().toLowerCase(); renderOpps(); });
     attachSort($("opp-table"));
+    attachSort($("buy-table"));
     // Losses table: custom sort handlers (column click returns to flat mode).
     {
       const KEYS = ["name", "n", "hulls", "cons", "months"];

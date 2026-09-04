@@ -95,6 +95,7 @@ async function main() {
   // 2. Pull each structure's full order book (authenticated) + its name.
   const structures = {};
   const sells = [...publicSells];
+  const buys = []; // buy orders across the system's structures
   for (const sid of structureIds) {
     const info = await esiJson(`${ESI}/universe/structures/${sid}/`, { headers: auth });
     structures[sid] = info.error ? KNOWN_NAMES[sid] || `structure ${sid}` : info.json.name;
@@ -106,10 +107,19 @@ async function main() {
     }
     for (const o of book.items) {
       if (!o.is_buy_order) sells.push({ ...o, location_id: sid });
+      else buys.push(o);
     }
   }
+  // Best (highest) buy per type: price, that order's remaining qty, and the
+  // type's total buy-side demand.
+  const bestBuy = {};
+  for (const o of buys) {
+    const b = bestBuy[o.type_id];
+    if (!b || o.price > b.p) bestBuy[o.type_id] = { p: o.price, q: o.volume_remain, tq: (b?.tq || 0) + o.volume_remain };
+    else b.tq += o.volume_remain;
+  }
   console.log(`Structures: ${JSON.stringify(structures)}`);
-  console.log(`Sell orders found: ${sells.length}`);
+  console.log(`Sell orders found: ${sells.length}; buy orders: ${buys.length} (${Object.keys(bestBuy).length} types)`);
 
   // 2b. Outstanding public contracts starting at our structures. Contract
   //     contents are immutable, so they're cached in contract-items.json and
@@ -179,7 +189,8 @@ async function main() {
   // 3. Jita reference prices from Janice (min sell at Jita 4-4, falling
   //    back to the 5-day median sell when Jita is momentarily out of stock).
   const contractTypeIds = Object.values(itemsCache).flatMap((items) => items.map((i) => i[0]));
-  const typeIds = [...new Set([...sells.map((o) => o.type_id), ...contractTypeIds, ...doctrineTypeIds, ...industryIds])];
+  const buyTypeIds = Object.keys(bestBuy).map(Number);
+  const typeIds = [...new Set([...sells.map((o) => o.type_id), ...contractTypeIds, ...doctrineTypeIds, ...industryIds, ...buyTypeIds])];
   const jita = {};
   const vols = {}; // packaged m³ per type, from Janice
   for (let i = 0; i < typeIds.length; i += 500) {
@@ -478,8 +489,11 @@ async function main() {
     for (const f of Object.values(doctrineData.fits)) {
       for (const [tid] of f.i) usedTypes.set(tid, (usedTypes.get(tid) || 0) + 1);
     }
+    // Items banned from every list (fit joke items etc.).
+    const EXCLUDE_NAMES = new Set(["Crimson Scythes Firework", "Sodium Firework"]);
+    const excluded = (tid) => EXCLUDE_NAMES.has(names[tid]);
     const missingBy = (cats) => [...usedTypes.keys()]
-      .filter((tid) => cats.includes(catCache[tid]?.[1]) && !xhqMkt[tid])
+      .filter((tid) => cats.includes(catCache[tid]?.[1]) && !xhqMkt[tid] && !excluded(tid))
       .map((tid) => ({ id: tid, name: names[tid] || `type ${tid}`, fits: usedTypes.get(tid) }))
       .sort((a, b) => b.fits - a.fits);
     writeFileSync(new URL("../readiness.json", import.meta.url), JSON.stringify({
@@ -544,7 +558,7 @@ async function main() {
 
     // Whole-market coverage: everything on the XHQ market joins the trade set.
     const marketTypeIds = [...new Set(sells.map((o) => o.type_id))];
-    const tradeIds = [...new Set([...doctrineTypeIds, ...industryIds, ...marketTypeIds])];
+    const tradeIds = [...new Set([...doctrineTypeIds, ...industryIds, ...marketTypeIds, ...buyTypeIds])];
 
     // Regional market velocity: average daily traded volume over the last 30
     // days from ESI market history (includes structure trades). ~1 request
@@ -578,7 +592,7 @@ async function main() {
         console.log(`Topped up market history for ${missing.length} new types.`);
       }
     }
-    const tradeItems = tradeIds.map((tid) => {
+    const tradeItems = tradeIds.filter((tid) => !excluded(tid)).map((tid) => {
       const m = xhqMkt[tid];
       return {
         id: tid,
@@ -594,13 +608,17 @@ async function main() {
         ...(lossCount[tid] && { lost: lossCount[tid] }),
       };
     });
+    const buyList = Object.entries(bestBuy)
+      .filter(([tid]) => !excluded(+tid))
+      .map(([tid, b]) => ({ id: +tid, p: b.p, q: b.q, tq: b.tq }));
     writeFileSync(new URL("../trade.json", import.meta.url), JSON.stringify({
       generated: new Date().toISOString(),
       system: "XHQ-7V",
       items: tradeItems,
       losses,
+      buys: buyList,
     }));
-    console.log(`Wrote trade.json: ${tradeItems.length} types, ${losses.length} ship loss types (${Object.values(lossCount).reduce((a, b) => a + b, 0)} losses/30d).`);
+    console.log(`Wrote trade.json: ${tradeItems.length} types, ${losses.length} ship loss types (${Object.values(lossCount).reduce((a, b) => a + b, 0)} losses/30d), ${buyList.length} buy-order types.`);
   }
 }
 
