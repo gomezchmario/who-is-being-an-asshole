@@ -217,14 +217,14 @@
 
     <!-- IMPLANT LOSSES -->
     <details class="doctrine">
-      <summary>IMPLANTS BEING DESTROYED (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
+      <summary>IMPLANTS &amp; DRUGS BEING DESTROYED (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
             <span class="flabel dim">VIEW</span>
-            <button id="ilp-scope" class="fbtn" title="Include every destroyed implant, not just ones used in a tracked doctrine set/hardwiring — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
+            <button id="ilp-scope" class="fbtn" title="Include every destroyed implant or drug, not just ones used in a tracked doctrine set/hardwiring — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
             <button id="ilp-all" class="fbtn" title="Show everything lost — clears the HIDE thresholds">CLEAR FILTERS</button>
-            <button id="ilp-mode" class="fbtn" title="Group by implant set (grade + slot), like the war room's missing-implants list">GROUP BY SET</button>
+            <button id="ilp-mode" class="fbtn" title="Group implants by set (grade + slot), hardwirings, and drugs separately, like the war room's missing-implants list">GROUP BY SET</button>
             <span id="ilp-hint" class="dim" style="font-size:12px"></span>
           </div>
           <div class="frow">
@@ -248,7 +248,7 @@
           <tbody id="il-imp-body"></tbody>
         </table></div>
 
-        <p class="note" style="margin-bottom:0">Implants only come off a killmail when the pod itself is destroyed — destroyed and dropped both count. Red = the Fort holds less than one month of replacements.</p>
+        <p class="note" style="margin-bottom:0">Implants (permanent cybernetics) and drugs/boosters (temporary buffs) only come off a killmail when the pod itself is destroyed — destroyed and dropped both count. Red = the Fort holds less than one month of replacements.</p>
       </div>
     </details>
 
