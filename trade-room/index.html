@@ -1006,9 +1006,10 @@
       $("ilp-mode").classList.toggle("on", ilImpState.grouped);
       renderImpTable();
     });
+    const IMP_KIND_LABELS = { implants: "IMPLANTS", drugs: "DRUGS", all: "BOTH" };
     $("ilp-kind").addEventListener("click", () => {
       impState.kind = IMP_KIND_CYCLE[(IMP_KIND_CYCLE.indexOf(impState.kind) + 1) % IMP_KIND_CYCLE.length];
-      $("ilp-kind").textContent = impState.kind.toUpperCase();
+      $("ilp-kind").textContent = IMP_KIND_LABELS[impState.kind];
       renderImpTable();
     });
     $("opp-scope").addEventListener("click", () => {
