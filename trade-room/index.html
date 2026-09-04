@@ -52,15 +52,6 @@
     .note { font-size: 13px; color: var(--phosphor-dim); line-height: 1.55; }
     .note b { color: var(--amber); }
     .advice li { margin-bottom: 6px; }
-    .subhead {
-      color: var(--amber); font-family: "VT323", monospace; font-size: 17px;
-      letter-spacing: 0.08em; margin: 14px 0 4px;
-    }
-    .subhead:first-of-type { margin-top: 4px; }
-    summary.subhead { cursor: pointer; list-style: none; }
-    summary.subhead::-webkit-details-marker { display: none; }
-    summary.subhead::before { content: "▸ "; }
-    details[open] > summary.subhead::before { content: "▾ "; }
   </style>
 </head>
 <body>
@@ -151,14 +142,14 @@
       </div>
     </details>
 
-    <!-- MODULE / AMMO LOSSES -->
+    <!-- MODULE LOSSES -->
     <details class="doctrine" open>
       <summary>DOCTRINE MODULES BEING DESTROYED (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
       <div class="inner">
         <div class="fgrid" style="margin-bottom:8px">
           <div class="frow">
             <span class="flabel dim">VIEW</span>
-            <button id="il-scope" class="fbtn" title="Include every destroyed module/ammo/drone, not just ones used in a tracked doctrine fit — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
+            <button id="il-scope" class="fbtn" title="Include every destroyed module, not just ones used in a tracked doctrine fit — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
             <button id="il-all" class="fbtn" title="Show everything lost — clears the HIDE thresholds">CLEAR FILTERS</button>
             <span id="il-hint" class="dim" style="font-size:12px"></span>
           </div>
@@ -173,7 +164,6 @@
           </div>
         </div>
 
-        <div class="subhead">MODULES</div>
         <div class="tablewrap"><table class="tr-table" id="il-mod-table">
           <thead><tr>
             <th class="left">ITEM</th>
@@ -184,22 +174,42 @@
           <tbody id="il-mod-body"></tbody>
         </table></div>
 
-        <details>
-          <summary class="subhead">AMMO + DRONES</summary>
-          <div class="frow" style="margin:2px 0 8px">
-            <span class="flabel dim">SORT</span>
+        <p class="note" style="margin-bottom:0">Destroyed and dropped both count — either way someone needs a new one. Red = the Fort holds less than one month of replacements.</p>
+      </div>
+    </details>
+
+    <!-- AMMO / DRONE LOSSES -->
+    <details class="doctrine">
+      <summary>AMMO + DRONES BEING DESTROYED (LAST 30 DAYS) — REPLACEMENT DEMAND</summary>
+      <div class="inner">
+        <div class="fgrid" style="margin-bottom:8px">
+          <div class="frow">
+            <span class="flabel dim">VIEW</span>
+            <button id="ila-scope" class="fbtn" title="Include every destroyed ammo/drone, not just ones used in a tracked doctrine fit — as long as the alliance is losing them, there's a market">ALL ITEMS</button>
+            <button id="ila-all" class="fbtn" title="Show everything lost — clears the HIDE thresholds">CLEAR FILTERS</button>
             <button id="il-ammo-mode" class="fbtn" title="Group by weapon family and size, like the war room's missing-ammo list">GROUP BY TYPE</button>
+            <span id="ila-hint" class="dim" style="font-size:12px"></span>
           </div>
-          <div class="tablewrap"><table class="tr-table" id="il-ammo-table">
-            <thead><tr>
-              <th class="left">ITEM</th>
-              <th class="num">LOST / 30D</th>
-              <th class="num">XHQ STOCK</th>
-              <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
-            </tr></thead>
-            <tbody id="il-ammo-body"></tbody>
-          </table></div>
-        </details>
+          <div class="frow">
+            <span class="flabel dim">HIDE</span>
+            <button id="ila-f-lost" class="fbtn on" title="Hide items with fewer losses than this">LOST &lt;</button>
+            <input type="text" id="ila-lost-min" value="100" spellcheck="false">
+            <span class="sep dim">│</span>
+            <button id="ila-f-stock" class="fbtn on" title="Hide items already stocked for more than this many months">STOCK &gt;</button>
+            <input type="text" id="ila-stock-max" value="1" spellcheck="false">
+            <span class="dim">MONTHS</span>
+          </div>
+        </div>
+
+        <div class="tablewrap"><table class="tr-table" id="il-ammo-table">
+          <thead><tr>
+            <th class="left">ITEM</th>
+            <th class="num">LOST / 30D</th>
+            <th class="num">XHQ STOCK</th>
+            <th class="num" title="XHQ stock ÷ losses per month">MONTHS OF STOCK</th>
+          </tr></thead>
+          <tbody id="il-ammo-body"></tbody>
+        </table></div>
 
         <p class="note" style="margin-bottom:0">Destroyed and dropped both count — either way someone needs a new one. Red = the Fort holds less than one month of replacements.</p>
       </div>
@@ -544,11 +554,11 @@
       imp: new Set([20]),
     };
 
-    // Destroyed modules/ammo/drones, tallied by fetch-data.mjs from zKillboard
-    // item breakdowns. Same shape and semantics as the ship-loss table above,
-    // split into two mini-tables by category.
-    const ilState = { scope: "doctrine", touched: false };
-    const ilFilters = { hideLost: true, hideStock: true };
+    // Destroyed modules and destroyed ammo/drones, tallied by fetch-data.mjs
+    // from zKillboard item breakdowns — two independent sections, same
+    // shape and filter semantics as the ship-loss table above.
+    const modState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true };
+    const ammoState = { scope: "doctrine", touched: false, hideLost: true, hideStock: true };
     const ilAmmoState = { grouped: false };
 
     // Same family/size grouping as the war room's missing-ammo list, so
@@ -572,18 +582,18 @@
     };
     const AMMO_GROUP_ORDER = [...AMMO_FAMILIES.map(([k]) => k).slice(0, -1), "DRONES", "PROBES & MISC"];
 
-    function itemLossRows(cats) {
+    function lossRows(cats, prefix, state) {
       const stockOf = new Map((data.items || []).map((i) => [i.id, i.xhq?.q || 0]));
       let entries = (data.itemLosses || [])
-        .filter((l) => cats.has(l.cat) && (ilState.scope === "all" || l.doctrine))
+        .filter((l) => cats.has(l.cat) && (state.scope === "all" || l.doctrine))
         .map((l) => {
           const stock = stockOf.get(l.id) || 0;
           const months = l.n ? stock / l.n : Infinity;
           return { id: l.id, name: l.name, n: l.n, cat: l.cat, stock, months };
         });
-      if (!ilState.touched) return entries.sort((a, b) => b.n - a.n).slice(0, 10);
-      if (ilFilters.hideLost) entries = entries.filter((e) => e.n >= num($("il-lost-min").value, 100));
-      if (ilFilters.hideStock) entries = entries.filter((e) => e.months <= num($("il-stock-max").value, 0.3));
+      if (!state.touched) return entries.sort((a, b) => b.n - a.n).slice(0, 10);
+      if (state.hideLost) entries = entries.filter((e) => e.n >= num($(prefix + "-lost-min").value, 100));
+      if (state.hideStock) entries = entries.filter((e) => e.months <= num($(prefix + "-stock-max").value, 0.3));
       return entries.sort((a, b) => b.n - a.n).slice(0, 200);
     }
 
@@ -597,33 +607,38 @@
       </tr>`;
     }
 
+    function renderModuleLosses() {
+      const rows = lossRows(CATSETS.mods, "il", modState);
+      $("il-mod-body").innerHTML = rows.map(itemLossRowHtml).join("")
+        || `<tr><td class="left dim" colspan="4">no ${modState.scope === "all" ? "" : "doctrine "}module losses recorded yet</td></tr>`;
+      $("il-hint").textContent = modState.touched ? "" : "— TOP 10 BY LOSSES · touch a filter for the full board";
+    }
+
     function renderAmmoTable() {
-      const entries = itemLossRows(CATSETS.ammo);
-      const emptyRow = `<tr><td class="left dim" colspan="4">no ${ilState.scope === "all" ? "" : "doctrine "}ammo/drone losses recorded yet</td></tr>`;
+      const entries = lossRows(CATSETS.ammo, "ila", ammoState);
+      const emptyRow = `<tr><td class="left dim" colspan="4">no ${ammoState.scope === "all" ? "" : "doctrine "}ammo/drone losses recorded yet</td></tr>`;
       if (!ilAmmoState.grouped) {
         $("il-ammo-body").innerHTML = entries.map(itemLossRowHtml).join("") || emptyRow;
-        return;
+      } else {
+        const groups = new Map();
+        const put = (k, e) => { if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); };
+        for (const e of entries) {
+          if (e.cat === 18) put("DRONES", e);
+          else put((AMMO_FAMILIES.find(([, re]) => re(e.name)) || AMMO_FAMILIES.at(-1))[0], e);
+        }
+        const order = AMMO_GROUP_ORDER.filter((k) => groups.has(k));
+        $("il-ammo-body").innerHTML = order.map((k) => {
+          const items = groups.get(k).sort((a, b) => ammoSizeRank(a.name) - ammoSizeRank(b.name) || b.n - a.n);
+          return `<tr><td colspan="4" class="left" style="color:var(--amber);letter-spacing:0.1em;padding-top:10px">▸ ${esc(k)}</td></tr>` +
+            items.map(itemLossRowHtml).join("");
+        }).join("") || emptyRow;
       }
-      const groups = new Map();
-      const put = (k, e) => { if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); };
-      for (const e of entries) {
-        if (e.cat === 18) put("DRONES", e);
-        else put((AMMO_FAMILIES.find(([, re]) => re(e.name)) || AMMO_FAMILIES.at(-1))[0], e);
-      }
-      const order = AMMO_GROUP_ORDER.filter((k) => groups.has(k));
-      $("il-ammo-body").innerHTML = order.map((k) => {
-        const items = groups.get(k).sort((a, b) => ammoSizeRank(a.name) - ammoSizeRank(b.name) || b.n - a.n);
-        return `<tr><td colspan="4" class="left" style="color:var(--amber);letter-spacing:0.1em;padding-top:10px">▸ ${esc(k)}</td></tr>` +
-          items.map(itemLossRowHtml).join("");
-      }).join("") || emptyRow;
+      $("ila-hint").textContent = ammoState.touched ? "" : "— TOP 10 BY LOSSES · touch a filter for the full board";
     }
 
     function renderItemLosses() {
-      const mods = itemLossRows(CATSETS.mods);
-      $("il-mod-body").innerHTML = mods.map(itemLossRowHtml).join("")
-        || `<tr><td class="left dim" colspan="4">no ${ilState.scope === "all" ? "" : "doctrine "}module losses recorded yet</td></tr>`;
+      renderModuleLosses();
       renderAmmoTable();
-      $("il-hint").textContent = ilState.touched ? "" : "— TOP 10 BY LOSSES EACH · touch a filter for the full board";
     }
 
     function passes(it) {
@@ -872,26 +887,30 @@
     $("lost-min").addEventListener("input", () => { lossTouch(); renderLosses(); });
     $("f-stock").addEventListener("click", () => { lossTouch(); lossFilters.hideStock = !lossFilters.hideStock; $("f-stock").classList.toggle("on", lossFilters.hideStock); syncLossAll(); renderLosses(); });
     $("stock-max").addEventListener("input", () => { lossTouch(); renderLosses(); });
-    const ilTouch = () => { ilState.touched = true; };
-    const syncIlAll = () => $("il-all").classList.toggle("on", !ilFilters.hideLost && !ilFilters.hideStock && ilState.touched);
-    $("il-scope").addEventListener("click", () => {
-      ilState.scope = ilState.scope === "all" ? "doctrine" : "all";
-      $("il-scope").classList.toggle("on", ilState.scope === "all");
-      renderItemLosses();
-    });
-    $("il-all").addEventListener("click", () => {
-      ilTouch();
-      ilFilters.hideLost = false;
-      ilFilters.hideStock = false;
-      $("il-f-lost").classList.remove("on");
-      $("il-f-stock").classList.remove("on");
-      syncIlAll();
-      renderItemLosses();
-    });
-    $("il-f-lost").addEventListener("click", () => { ilTouch(); ilFilters.hideLost = !ilFilters.hideLost; $("il-f-lost").classList.toggle("on", ilFilters.hideLost); syncIlAll(); renderItemLosses(); });
-    $("il-lost-min").addEventListener("input", () => { ilTouch(); renderItemLosses(); });
-    $("il-f-stock").addEventListener("click", () => { ilTouch(); ilFilters.hideStock = !ilFilters.hideStock; $("il-f-stock").classList.toggle("on", ilFilters.hideStock); syncIlAll(); renderItemLosses(); });
-    $("il-stock-max").addEventListener("input", () => { ilTouch(); renderItemLosses(); });
+    function wireLossSection(prefix, state, render) {
+      const touch = () => { state.touched = true; };
+      const syncAll = () => $(`${prefix}-all`).classList.toggle("on", !state.hideLost && !state.hideStock && state.touched);
+      $(`${prefix}-scope`).addEventListener("click", () => {
+        state.scope = state.scope === "all" ? "doctrine" : "all";
+        $(`${prefix}-scope`).classList.toggle("on", state.scope === "all");
+        render();
+      });
+      $(`${prefix}-all`).addEventListener("click", () => {
+        touch();
+        state.hideLost = false;
+        state.hideStock = false;
+        $(`${prefix}-f-lost`).classList.remove("on");
+        $(`${prefix}-f-stock`).classList.remove("on");
+        syncAll();
+        render();
+      });
+      $(`${prefix}-f-lost`).addEventListener("click", () => { touch(); state.hideLost = !state.hideLost; $(`${prefix}-f-lost`).classList.toggle("on", state.hideLost); syncAll(); render(); });
+      $(`${prefix}-lost-min`).addEventListener("input", () => { touch(); render(); });
+      $(`${prefix}-f-stock`).addEventListener("click", () => { touch(); state.hideStock = !state.hideStock; $(`${prefix}-f-stock`).classList.toggle("on", state.hideStock); syncAll(); render(); });
+      $(`${prefix}-stock-max`).addEventListener("input", () => { touch(); render(); });
+    }
+    wireLossSection("il", modState, renderModuleLosses);
+    wireLossSection("ila", ammoState, renderAmmoTable);
     $("il-ammo-mode").addEventListener("click", () => {
       ilAmmoState.grouped = !ilAmmoState.grouped;
       $("il-ammo-mode").classList.toggle("on", ilAmmoState.grouped);
