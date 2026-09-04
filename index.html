@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WHO IS BEING AN ASSHOLE?</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💢</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <div class="crt" aria-hidden="true"></div>
+
+  <main class="terminal">
+    <header>
+      <div class="topline">
+        <span>CONCORD MARKET SURVEILLANCE NODE // PROVIDENCE</span>
+        <span id="clock">--:--:--</span>
+      </div>
+      <h1 class="title">WHO IS BEING<br>AN <span class="red glitch">ASSHOLE</span>?</h1>
+      <p class="subtitle">▸ XHQ-7V PRICE GOUGING DETECTOR ◂</p>
+      <p class="tagline" id="tagline">flagging sell orders priced &gt;<span id="threshold-label">20</span>% above Jita 4-4</p>
+    </header>
+
+    <section class="panel">
+      <div class="row spread wrap">
+        <span id="scan-info" class="dim">ESTABLISHING UPLINK<span class="blink">…</span></span>
+        <span class="controls">
+          <label for="threshold">ASSHOLE THRESHOLD&nbsp;</label>
+          <input type="number" id="threshold" value="20" min="0" max="900" step="5">
+          <span>%</span>
+        </span>
+      </div>
+    </section>
+
+    <section id="status" class="log"></section>
+
+    <section id="results" class="hidden">
+      <div id="summary" class="summary"></div>
+      <div class="tablewrap">
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th class="left">VERDICT</th>
+              <th class="left">ITEM</th>
+              <th class="num">QTY</th>
+              <th class="num">LOCAL PRICE</th>
+              <th class="num">JITA SELL</th>
+              <th class="num">MARKUP</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </div>
+      <div class="row spread wrap">
+        <p class="dim small">CONCORD redacts seller names from public feeds. But you know who you are.</p>
+        <p class="dim small"><label><input type="checkbox" id="show-all"> show honest orders too</label></p>
+      </div>
+    </section>
+
+    <footer>
+      <p class="dim small">unofficial · not affiliated with CCP Games · data: EVE ESI + Fuzzwork · reference price: Jita 4-4 min sell · auto-updates every ~30 min</p>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

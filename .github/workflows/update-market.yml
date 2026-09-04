@@ -1,0 +1,39 @@
+name: update market data
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-market
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Scan XHQ-7V market
+        env:
+          EVE_CLIENT_ID: ${{ secrets.EVE_CLIENT_ID }}
+          EVE_CLIENT_SECRET: ${{ secrets.EVE_CLIENT_SECRET }}
+          EVE_REFRESH_TOKEN: ${{ secrets.EVE_REFRESH_TOKEN }}
+        run: node scripts/fetch-data.mjs
+
+      - name: Commit data.json
+        run: |
+          git config user.name "concord-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data.json
+          git diff --cached --quiet && echo "No market changes." && exit 0
+          git commit -m "market scan $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git push
