@@ -305,7 +305,7 @@
       const rowHtml = (e) => {
         const bad = e.months < 1;
         return `<tr class="${bad ? "tier3" : ""}">
-          <td class="left"><a class="itemname" href="https://zkillboard.com/ship/${e.id}/losses/" target="_blank" rel="noopener" title="View these losses on zKillboard">${esc(e.name)}</a>${bad ? ' <span class="demandtag d-miss">RESTOCK</span>' : ""}</td>
+          <td class="left"><a class="itemname" href="https://zkillboard.com/alliance/1988009451/ship/${e.id}/losses/" target="_blank" rel="noopener" title="CVA losses of this hull on zKillboard">${esc(e.name)}</a> <a class="dim" style="font-size:11px" href="https://zkillboard.com/alliance/99010240/ship/${e.id}/losses/" target="_blank" rel="noopener" title="CVAA losses of this hull">+CVAA</a>${bad ? ' <span class="demandtag d-miss">RESTOCK</span>' : ""}</td>
           <td class="num">${e.n}</td>
           <td class="num">${e.hulls}</td>
           <td class="num">${e.cons}</td>
