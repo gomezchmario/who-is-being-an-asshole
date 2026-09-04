@@ -103,6 +103,28 @@
       return m < 60 ? m + " min ago" : Math.floor(m / 60) + "h " + (m % 60) + "m ago";
     }
 
+    let conByHull = new Map(); // hull type_id -> contracts, filled from contracts.json
+
+    function contractRows(hullId) {
+      const cons = conByHull.get(hullId) || [];
+      if (!cons.length) return "";
+      const rows = cons.map((c) => `
+        <tr>
+          <td class="left">${esc(c.title || c.hull || "contract " + c.id)}</td>
+          <td class="left">${esc(c.issuer)}</td>
+          <td class="num">${isk(c.price)}</td>
+          <td class="num">${isk(c.value)}</td>
+          <td class="num" style="color:${c.markup > 0.3 ? "var(--red)" : "var(--phosphor)"}">${c.markup != null ? (c.markup >= 0 ? "+" : "") + Math.round(c.markup * 100) + "%" : "—"}</td>
+        </tr>`).join("");
+      return `
+        <details class="items"><summary>view ${cons.length} contract${cons.length > 1 ? "s" : ""}</summary>
+          <div class="tablewrap"><table>
+            <thead><tr><th class="left">CONTRACT</th><th class="left">ISSUER</th><th class="num">ASKING</th><th class="num">JITA VALUE</th><th class="num">MARKUP</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>
+        </details>`;
+    }
+
     function fitBlock(f) {
       const hullMkt = f.hullMkt ? `<b>${f.hullMkt.q}</b> on market @ ${isk(f.hullMkt.min)}` : `<span class="missline">none on market</span>`;
       const hullCon = f.hullCon ? `<b>${f.hullCon.n}</b> contracts from ${isk(f.hullCon.min)}` : `<span class="missline">no contracts</span>`;
@@ -128,6 +150,7 @@
             ${!f.xhqPartial && f.costJita ? `<span class="dim">(XHQ is ${Math.round((f.costXhq / f.costJita - 1) * 100)}% vs Jita)</span>` : ""}
           </div>
           ${miss}
+          ${contractRows(f.hull)}
           <details class="items"><summary>item breakdown</summary>
             <div class="tablewrap"><table>
               <thead><tr><th class="left">ITEM</th><th class="num">QTY</th><th class="num">XHQ (avail)</th><th class="num">JITA</th><th class="num">AMARR</th></tr></thead>
@@ -193,8 +216,21 @@
       }).join("");
     }
 
-    fetch("../readiness.json", { cache: "no-cache" })
-      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    Promise.all([
+      fetch("../readiness.json", { cache: "no-cache" })
+        .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
+      fetch("../contracts.json", { cache: "no-cache" })
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ])
+      .then(([readiness, contracts]) => {
+        for (const c of contracts?.contracts || []) {
+          if (!c.hull_id) continue;
+          if (!conByHull.has(c.hull_id)) conByHull.set(c.hull_id, []);
+          conByHull.get(c.hull_id).push(c);
+        }
+        for (const list of conByHull.values()) list.sort((a, b) => a.price - b.price);
+        return readiness;
+      })
       .then(render)
       .catch((e) => {
         $("status").innerHTML = `<span class="err">NO READINESS DATA YET (${esc(e.message)}). Run the update workflow after committing doctrines.json.</span>`;
