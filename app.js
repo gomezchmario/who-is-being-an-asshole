@@ -18,6 +18,7 @@
   ];
   const SAINT = { label: "█ SAINT", cls: "v6", tier: 6 };
   const SUPPORTER = { label: "▒ SUPPORTER", cls: "v7", tier: 7 };
+  const LOCAL = { label: "░ LOCAL", cls: "v8", tier: 8 };
   const HONEST = { label: "░ HONEST", cls: "v0", tier: 0 };
 
   let data = null;
@@ -88,6 +89,7 @@
     const pct = Math.round(markup * 100);
     if (pct <= -15) return SAINT;
     if (pct <= -7) return SUPPORTER;
+    if (pct <= 0) return LOCAL;
     for (const cand of VERDICTS) {
       if (pct >= Math.round((cand.min ?? threshold) * 100)) return cand;
     }
@@ -248,6 +250,7 @@
         { type_id: 12608, name: "Hobgoblin II", price: 690000, jita: 310000, volume: 45, location_id: "1035949018593", markup: 1.2258, cat: 18 },
         { type_id: 526, name: "Stasis Webifier I", price: 850000, jita: 1000000, volume: 12, location_id: "1035949018593", markup: -0.15, cat: 7 },
         { type_id: 527, name: "X5 Enduring Stasis Webifier", price: 1800000, jita: 2000000, volume: 6, location_id: "1035949018593", markup: -0.10, cat: 7 },
+        { type_id: 2456, name: "Fleeting Compact Stasis Webifier", price: 1940000, jita: 2000000, volume: 3, location_id: "1035949018593", markup: -0.03, cat: 7 },
       ],
     };
   }
