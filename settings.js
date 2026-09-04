@@ -49,6 +49,14 @@
   }
   startSchedule();
 
+  // Deuteranomaly mode: swaps the site's red "bad" signal for blue, since
+  // red-green color blindness is what makes red vs. green hardest to tell
+  // apart in the first place.
+  const DEUTAN_KEY = "deuteranomaly-mode";
+  let deutan = false;
+  try { deutan = localStorage.getItem(DEUTAN_KEY) === "1"; } catch (e) {}
+  document.body.classList.toggle("deuteranomaly", deutan);
+
   const btn = document.getElementById("settings-btn");
   if (!btn) return;
 
@@ -68,6 +76,10 @@
         <input type="text" id="flicker-chance" class="settings-num" inputmode="numeric">% chance it flickers again for
         <input type="text" id="flicker-burst" class="settings-num" inputmode="numeric"> sec.
       </p>
+      <label class="settings-row" style="margin-top:14px">
+        <input type="checkbox" id="deutan-toggle">
+        <span>Deuteranomaly mode (swap red for blue)</span>
+      </label>
     </div>`;
   document.body.appendChild(overlay);
 
@@ -76,6 +88,7 @@
   const fCycle = overlay.querySelector("#flicker-cycle");
   const fChance = overlay.querySelector("#flicker-chance");
   const fBurst = overlay.querySelector("#flicker-burst");
+  const deutanToggle = overlay.querySelector("#deutan-toggle");
 
   function syncFields() {
     toggle.checked = cfg.enabled;
@@ -83,6 +96,7 @@
     fCycle.value = cfg.cycleSec;
     fChance.value = cfg.chancePct;
     fBurst.value = cfg.burstSec;
+    deutanToggle.checked = deutan;
   }
   syncFields();
 
@@ -113,4 +127,10 @@
   numField(fCycle, "cycleSec", 1, 3600);
   numField(fChance, "chancePct", 0, 100);
   numField(fBurst, "burstSec", 0, 3600);
+
+  deutanToggle.addEventListener("change", () => {
+    deutan = deutanToggle.checked;
+    document.body.classList.toggle("deuteranomaly", deutan);
+    try { localStorage.setItem(DEUTAN_KEY, deutan ? "1" : "0"); } catch (e) {}
+  });
 })();
