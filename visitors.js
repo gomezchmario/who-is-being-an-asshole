@@ -2,7 +2,7 @@
  * Fails silently if the endpoint isn't reachable or public stats are off.
  */
 (() => {
-  fetch("https://xhq7v.goatcounter.com/counter/TOTAL.json")
+  fetch("https://xhq.goatcounter.com/counter/TOTAL.json")
     .then((r) => (r.ok ? r.json() : null))
     .then((d) => {
       if (!d?.count) return;
