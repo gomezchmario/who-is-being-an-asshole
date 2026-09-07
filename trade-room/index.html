@@ -1085,6 +1085,16 @@
     attachSort($("opp-table"));
     attachSort($("buy-table"));
     $("buy-export").addEventListener("click", () => {
+      if (!buyState.export) {
+        let unlocked = false;
+        try { unlocked = localStorage.getItem("export-pin-ok") === "1"; } catch (e) {}
+        if (!unlocked) {
+          const pin = window.prompt("PIN required to enable EXPORT TO HUBS:");
+          if (pin === null) return;
+          if (pin.trim() !== "2988") { alert("Wrong PIN."); return; }
+          try { localStorage.setItem("export-pin-ok", "1"); } catch (e) {}
+        }
+      }
       buyState.export = !buyState.export;
       $("buy-export").classList.toggle("on", buyState.export);
       renderBuys();
